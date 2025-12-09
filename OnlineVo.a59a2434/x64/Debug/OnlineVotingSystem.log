@@ -1,0 +1,20 @@
+﻿  OnlineVotingSystem.cpp
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voter.h(493,37): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voter.h(502,50): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voter.h(541,35): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(65,23): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(497,35): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(547,27): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+  OnlineVotingSystem.vcxproj -> C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\x64\Debug\OnlineVotingSystem.exe
