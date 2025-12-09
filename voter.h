@@ -6,23 +6,23 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <cctype>
 using namespace std;
 
 struct Voter {
     string voterID;
     string name;
     string cnic;
-    string gender;
+    char gender;
     string contactNumber;
     string town;
     string pollingStation;
-    string username;
     string password;
     bool hasVoted;
 
-    Voter(string id = "", string n = "", string c = "", string g = "",
+    Voter(string id = "", string n = "", string c = "", char g = 'O',
         string phone = "", string t = "", string station = "",
-        string user = "", string pass = "", bool voted = false) {
+        string pass = "", bool voted = false) {
         voterID = id;
         name = n;
         cnic = c;
@@ -30,7 +30,6 @@ struct Voter {
         contactNumber = phone;
         town = t;
         pollingStation = station;
-        username = user;
         password = pass;
         hasVoted = voted;
     }
@@ -126,53 +125,31 @@ private:
         return stations[stationIndex];
     }
 
-    string generateVoterID(int seqNumber, string town, string station) {
-        string townCode = "";
-        if (town.length() >= 2) {
-            townCode += toupper(town[0]);
-            townCode += toupper(town[1]);
-        }
-        else {
-            townCode = "XX";
-        }
+    // Generate Voter ID starting with "VID" followed by sequential numbers
+    string generateVoterID() {
+        int maxID = 0;
 
-        string stationCode = "";
-        if (station.length() >= 2) {
-            stationCode = station.substr(station.length() - 2);
-        }
-        else {
-            stationCode = "01";
-        }
-
-        stringstream ss;
-        ss << "V" << setw(5) << setfill('0') << seqNumber << townCode << stationCode;
-        return ss.str();
-    }
-
-    int getNextVoterSequence() {
-        int maxSeq = 0;
+        // Scan all voters to find highest VID number
         for (int i = 0; i < tableSize; i++) {
             for (auto v : table[i]) {
-                if (v->voterID.length() >= 6 && v->voterID[0] == 'V') {
-                    string seqStr = v->voterID.substr(1, 5);
-                    bool isNumber = true;
-                    for (char c : seqStr) {
-                        if (!isdigit(c)) {
-                            isNumber = false;
-                            break;
+                if (v->voterID.length() >= 3 && v->voterID.substr(0, 3) == "VID") {
+                    string numPart = v->voterID.substr(3); // Get "00001" part
+                    try {
+                        int currentID = stoi(numPart);
+                        if (currentID > maxID) {
+                            maxID = currentID;
                         }
                     }
-                    if (isNumber) {
-                        int seq = 0;
-                        for (char c : seqStr) {
-                            seq = seq * 10 + (c - '0');
-                        }
-                        if (seq > maxSeq) maxSeq = seq;
+                    catch (...) {
+                        // If conversion fails, skip this voter
                     }
                 }
             }
         }
-        return maxSeq + 1;
+
+        stringstream ss;
+        ss << "VID" << setw(5) << setfill('0') << (maxID + 1);
+        return ss.str();
     }
 
     bool validateCNIC(const string& cnic) {
@@ -192,6 +169,22 @@ private:
         return true;
     }
 
+    bool validatePassword(const string& password) {
+        // Password must be at least 6 characters
+        if (password.length() < 6) return false;
+        return true;
+    }
+
+    char validateGenderInput(const string& genderInput) {
+        if (genderInput.length() == 0) return 'O';
+
+        char genderChar = toupper(genderInput[0]);
+        if (genderChar == 'M' || genderChar == 'F' || genderChar == 'O') {
+            return genderChar;
+        }
+        return 'O';  // Default to 'Other' if invalid input
+    }
+
     void saveVoterToFile(Voter* v) {
         ofstream out(FILENAME, ios::app | ios::binary);
         if (!out) return;
@@ -205,54 +198,115 @@ private:
         writeString(v->voterID);
         writeString(v->name);
         writeString(v->cnic);
-        writeString(v->gender);
+        out.write((char*)&v->gender, sizeof(v->gender));  // Store char directly
         writeString(v->contactNumber);
         writeString(v->town);
         writeString(v->pollingStation);
-        writeString(v->username);
-        writeString(v->password);
+        writeString(v->password);  // Only password, no username
         out.write((char*)&v->hasVoted, sizeof(v->hasVoted));
         out.close();
     }
 
     void loadFromFile() {
         ifstream in(FILENAME, ios::binary);
-        if (!in) return;
+        if (!in) {
+            cout << "No voter data file found. Starting fresh.\n";
+            return;
+        }
 
-        while (in.peek() != EOF) {
+        // Clear existing in-memory data first
+        for (int i = 0; i < tableSize; i++) {
+            for (auto v : table[i]) {
+                delete v;
+            }
+            table[i].clear();
+        }
+
+        cout << "Loading voter data from file...\n";
+
+        int loadedCount = 0;
+        while (true) {
             Voter* v = new Voter();
             size_t len;
-            char buffer[256];
 
-            auto readString = [&in, &len, &buffer]() -> string {
-                in.read((char*)&len, sizeof(len));
-                if (len >= sizeof(buffer)) len = sizeof(buffer) - 1;
-                in.read(buffer, len);
-                buffer[len] = '\0';
-                return string(buffer);
-                };
+            // === READ VOTERID ===
+            in.read((char*)&len, sizeof(len));
+            if (in.eof() || !in.good()) {
+                delete v;
+                break;
+            }
 
-            v->voterID = readString();
-            v->name = readString();
-            v->cnic = readString();
-            v->gender = readString();
-            v->contactNumber = readString();
-            v->town = readString();
-            v->pollingStation = readString();
-            v->username = readString();
-            v->password = readString();
-            in.read((char*)&v->hasVoted, sizeof(v->hasVoted));
+            if (len > 1000) {
+                delete v;
+                cout << "Error: Invalid voterID length\n";
+                break;
+            }
 
+            v->voterID.resize(len);
+            in.read(&v->voterID[0], len);
+
+            // === READ NAME ===
+            in.read((char*)&len, sizeof(len));
+            v->name.resize(len);
+            in.read(&v->name[0], len);
+
+            // === READ CNIC ===
+            in.read((char*)&len, sizeof(len));
+            v->cnic.resize(len);
+            in.read(&v->cnic[0], len);
+
+            // === READ GENDER (CHAR) ===
+            in.read(&v->gender, sizeof(char));
+
+            // === READ CONTACT ===
+            in.read((char*)&len, sizeof(len));
+            v->contactNumber.resize(len);
+            in.read(&v->contactNumber[0], len);
+
+            // === READ TOWN ===
+            in.read((char*)&len, sizeof(len));
+            v->town.resize(len);
+            in.read(&v->town[0], len);
+
+            // === READ POLLING STATION ===
+            in.read((char*)&len, sizeof(len));
+            v->pollingStation.resize(len);
+            in.read(&v->pollingStation[0], len);
+
+            // === READ PASSWORD ===
+            in.read((char*)&len, sizeof(len));
+            v->password.resize(len);
+            in.read(&v->password[0], len);
+
+            // === READ HASVOTED ===
+            in.read((char*)&v->hasVoted, sizeof(bool));
+
+            // Check if read was successful
+            if (!in.good()) {
+                delete v;
+                if (in.eof()) break;
+                cout << "Warning: Error reading voter data at record #" << (loadedCount + 1) << endl;
+                break;
+            }
+
+            // Add to hash table
             int index = hashFunc(v->voterID);
             table[index].push_back(v);
+            loadedCount++;
         }
+
         in.close();
+        cout << "Loaded " << loadedCount << " voters from file.\n";
     }
 
     void saveAllToFile() {
-        ofstream out(FILENAME, ios::out | ios::binary);
-        if (!out) return;
+        ofstream out(FILENAME, ios::out | ios::binary | ios::trunc);
+        if (!out) {
+            cout << "Error: Cannot open voter data file for writing!\n";
+            return;
+        }
 
+        int savedCount = 0;
         for (int i = 0; i < tableSize; i++) {
             for (auto v : table[i]) {
                 auto writeString = [&out](const string& str) {
@@ -264,16 +318,25 @@ private:
                 writeString(v->voterID);
                 writeString(v->name);
                 writeString(v->cnic);
-                writeString(v->gender);
+                out.write((char*)&v->gender, sizeof(v->gender));
                 writeString(v->contactNumber);
                 writeString(v->town);
                 writeString(v->pollingStation);
-                writeString(v->username);
                 writeString(v->password);
                 out.write((char*)&v->hasVoted, sizeof(v->hasVoted));
+
+                savedCount++;
             }
         }
+
         out.close();
+
+        if (!out.good()) {
+            cout << "Warning: There might have been an error writing voter data!\n";
+        }
+        else {
+            cout << "Saved " << savedCount << " voters to file.\n";
+        }
     }
 
     bool existsInVector(const vector<string>& vec, const string& str) {
@@ -283,27 +346,90 @@ private:
         return false;
     }
 
+    void validateAllVoterIDs() {
+        cout << "Validating Voter IDs...\n";
+        int invalidCount = 0;
+        for (int i = 0; i < tableSize; i++) {
+            for (auto v : table[i]) {
+                if (v->voterID.empty() || v->voterID.substr(0, 3) != "VID") {
+                    cout << "Warning: Invalid Voter ID found: '" << v->voterID
+                        << "' for voter: '" << v->name << "'" << endl;
+                    invalidCount++;
+                }
+            }
+        }
+        if (invalidCount == 0) {
+            cout << "All Voter IDs are valid.\n";
+        }
+    }
+
+    void cleanCorruptedEntries() {
+        int removed = 0;
+        for (int i = 0; i < tableSize; i++) {
+            for (auto it = table[i].begin(); it != table[i].end(); ) {
+                Voter* v = *it;
+
+                // If voter has no name or invalid CNIC, it's corrupted
+                bool isCorrupted = false;
+
+                // Check for obvious corruption
+                if (v->name.empty() && v->cnic.empty() && v->voterID.empty()) {
+                    isCorrupted = true;
+                }
+                // Check if gender is valid
+                else if (v->gender != 'M' && v->gender != 'F' && v->gender != 'O') {
+                    v->gender = 'O'; // Fix invalid gender
+                }
+
+                if (isCorrupted) {
+                    cout << "Removing corrupted entry: " << v->voterID << endl;
+                    delete v;
+                    it = table[i].erase(it);
+                    removed++;
+                }
+                else {
+                    ++it;
+                }
+            }
+        }
+
+        if (removed > 0) {
+            cout << "Removed " << removed << " corrupted entries.\n";
+        }
+    }
+
 public:
     VoterHashTable(int size) {
         tableSize = size;
         table = new vector<Voter*>[tableSize];
         initializeTownStations();
         loadFromFile();
+        cleanCorruptedEntries();
+        validateAllVoterIDs();
     }
 
     ~VoterHashTable() {
+        cout << "Saving voter data to file...\n";
         saveAllToFile();
+
+        // Clean up memory
         for (int i = 0; i < tableSize; i++) {
             for (auto v : table[i]) {
                 delete v;
             }
+            table[i].clear();
         }
         delete[] table;
     }
 
-    void insertVoter(string name, string cnic, string gender,
-        string contact, string town,
-        string username = "", string password = "") {
+    void insertVoter(string name, string cnic, string genderInput,
+        string contact, string town, string password) {
+
+        // Check for duplicate CNIC
+        if (searchByCNIC(cnic) != nullptr) {
+            cout << "Error: CNIC '" << cnic << "' is already registered!\n";
+            return;
+        }
 
         if (!validateCNIC(cnic)) {
             cout << "Error: Invalid CNIC! Must be 13 digits.\n";
@@ -315,21 +441,29 @@ public:
             return;
         }
 
-        if (searchByCNIC(cnic) != nullptr) {
-            cout << "Error: CNIC '" << cnic << "' is already registered!\n";
+        if (!validatePassword(password)) {
+            cout << "Error: Password must be at least 6 characters long.\n";
             return;
         }
 
-        string station = assignPollingStation(town, cnic);
-        int seqNum = getNextVoterSequence();
-        string voterID = generateVoterID(seqNum, town, station);
+        // Validate and convert gender input
+        char gender = validateGenderInput(genderInput);
+        if (gender == 'O' && (toupper(genderInput[0]) != 'O')) {
+            cout << "Warning: Gender set to 'Other' (valid: M/m, F/f, O/o)\n";
+        }
 
-        if (username.empty()) username = cnic;
-        if (password.empty()) password = "pass" + cnic.substr(7, 4);
+        string station = assignPollingStation(town, cnic);
+        string voterID = generateVoterID();  // Generate new VID-based ID
+
+        // Check for duplicate Voter ID (should not happen with sequential IDs)
+        if (searchVoter(voterID) != nullptr) {
+            cout << "Error: Voter ID collision detected! Please try again.\n";
+            return;
+        }
 
         int index = hashFunc(voterID);
         Voter* v = new Voter(voterID, name, cnic, gender, contact,
-            town, station, username, password, false);
+            town, station, password, false);  // No username
         table[index].push_back(v);
 
         saveVoterToFile(v);
@@ -341,7 +475,6 @@ public:
         cout << "Name:          " << name << "\n";
         cout << "Polling Station: " << station << "\n";
         cout << "Town:          " << town << "\n";
-        cout << "Username:      " << username << "\n";
         cout << "Password:      " << password << "\n";
         cout << "========================================\n";
     }
@@ -365,14 +498,14 @@ public:
         return nullptr;
     }
 
-    Voter* searchByUsername(string username) {
-        for (int i = 0; i < tableSize; i++) {
-            for (auto v : table[i]) {
-                if (v->username == username)
-                    return v;
-            }
-        }
-        return nullptr;
+    // Updated: Search by CNIC or Voter ID for login
+    Voter* searchForLogin(string identifier) {
+        // Try as Voter ID first
+        Voter* v = searchVoter(identifier);
+        if (v) return v;
+
+        // Try as CNIC
+        return searchByCNIC(identifier);
     }
 
     void printTable() {
@@ -389,11 +522,16 @@ public:
                 cout << "Voter ID:      " << v->voterID << "\n";
                 cout << "Name:          " << v->name << "\n";
                 cout << "CNIC:          " << v->cnic << "\n";
-                cout << "Gender:        " << v->gender << "\n";
+                cout << "Gender:        ";
+                switch (toupper(v->gender)) {
+                case 'M': cout << "Male\n"; break;
+                case 'F': cout << "Female\n"; break;
+                case 'O': cout << "Other\n"; break;
+                default: cout << "Unknown\n";
+                }
                 cout << "Contact:       " << v->contactNumber << "\n";
                 cout << "Town:          " << v->town << "\n";
                 cout << "Polling Station: " << v->pollingStation << "\n";
-                cout << "Username:      " << v->username << "\n";
                 cout << "Voted:         " << (v->hasVoted ? "Yes" : "No") << "\n";
                 cout << string(40, '-') << "\n\n";
             }
@@ -417,7 +555,14 @@ public:
                     count++;
                     cout << count << ". " << v->name << " (" << v->voterID << ")\n";
                     cout << "   CNIC: " << v->cnic << " | Contact: " << v->contactNumber << "\n";
-                    cout << "   Voted: " << (v->hasVoted ? "Yes" : "No") << "\n";
+                    cout << "   Gender: ";
+                    switch (toupper(v->gender)) {
+                    case 'M': cout << "Male"; break;
+                    case 'F': cout << "Female"; break;
+                    case 'O': cout << "Other"; break;
+                    default: cout << "Unknown";
+                    }
+                    cout << " | Voted: " << (v->hasVoted ? "Yes" : "No") << "\n";
                     cout << string(30, '-') << "\n";
                 }
             }
@@ -442,7 +587,14 @@ public:
                     count++;
                     cout << count << ". " << v->name << " (" << v->voterID << ")\n";
                     cout << "   Station: " << v->pollingStation << " | CNIC: " << v->cnic << "\n";
-                    cout << "   Voted: " << (v->hasVoted ? "Yes" : "No") << "\n";
+                    cout << "   Gender: ";
+                    switch (toupper(v->gender)) {
+                    case 'M': cout << "Male"; break;
+                    case 'F': cout << "Female"; break;
+                    case 'O': cout << "Other"; break;
+                    default: cout << "Unknown";
+                    }
+                    cout << " | Voted: " << (v->hasVoted ? "Yes" : "No") << "\n";
                     cout << string(30, '-') << "\n";
                 }
             }
@@ -601,12 +753,22 @@ public:
 
     bool updatePassword(string voterID, string newPassword) {
         Voter* v = searchVoter(voterID);
-        if (v) {
+        if (v && validatePassword(newPassword)) {
             v->password = newPassword;
             saveAllToFile();
             return true;
         }
         return false;
+    }
+
+    // Helper function to convert gender char to string for display
+    string getGenderString(char gender) {
+        switch (toupper(gender)) {
+        case 'M': return "Male";
+        case 'F': return "Female";
+        case 'O': return "Other";
+        default: return "Unknown";
+        }
     }
 };
 

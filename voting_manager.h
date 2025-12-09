@@ -71,32 +71,91 @@ public:
     //                   VOTER VIEW (UPDATED)
     // -------------------------------------------------
     void voterView(VoterHashTable& voters, CandidateBTree& candidates) {
-        printHeader("VOTER LOGIN");
+        printHeader("VOTER LOGIN / REGISTRATION");
 
-        string username, password;
-        cout << "Enter Username (or CNIC): ";
-        getline(cin, username);
+        int choice;
+        cout << "1. Login (Already Registered)\n";
+        cout << "2. Register (New Voter)\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+        clearInput();
 
-        cout << "Enter Password: ";
-        getline(cin, password);
+        Voter* v = nullptr;
 
-        // Try searching by username first
-        Voter* v = voters.searchByUsername(username);
+        if (choice == 1) {
+            // Login flow
+            printHeader("VOTER LOGIN");
 
-        // If not found by username, try searching by CNIC
-        if (!v && voters.searchByCNIC(username) != nullptr) {
-            v = voters.searchByCNIC(username);
+            string vid, password;
+            cout << "Enter your ID (or CNIC): ";
+            getline(cin, vid);
+            cout << "Enter Password: ";
+            getline(cin, password);
+
+            // Try searching by id first
+            v = voters.searchForLogin(vid);
+            if (!v && voters.searchByCNIC(vid) != nullptr) {
+                v = voters.searchByCNIC(vid);
+            }
+
+            if (!v) {
+                cout << "Error: Voter not found!\n";
+                return;
+            }
+
+            if (v->password != password) {
+                cout << "Error: Incorrect password!\n";
+                return;
+            }
         }
+        else if (choice == 2) {
+            // Registration flow
+            printHeader("NEW VOTER REGISTRATION");
 
-        if (!v) {
-            cout << "Error: Voter not found!\n";
+            string name, cnic, gender, contact, town, password;
+            cout << "Enter Full Name: ";
+            getline(cin, name);
+            cout << "Enter CNIC (13 digits): ";
+            getline(cin, cnic);
+            cout << "Enter Gender (Male/Female/Other): ";
+            getline(cin, gender);
+            cout << "Enter Contact Number (11 digits starting with 03): ";
+            getline(cin, contact);
+            cout << "Enter Town: ";
+            getline(cin, town);
+            cout << "Enter Password (min 6 characters): ";
+            getline(cin, password);
+
+            // Register the voter
+            voters.insertVoter(name, cnic, gender, contact, town,password);
+
+            // Get the newly created voter
+            v = voters.searchByCNIC(cnic);
+            if (!v) {
+                cout << "Registration failed! Please try again.\n";
+                return;
+            }
+
+            cout << "\n" << string(50, '=') << "\n";
+            cout << "    REGISTRATION SUCCESSFUL!\n";
+            cout << string(50, '=') << "\n";
+            cout << "Your Voter ID is: " << v->voterID << "\n";
+            cout << "Password: " << v->password << "\n";
+            cout << "Please remember these credentials for login.\n";
+            cout << string(50, '=') << "\n\n";
+
+            cout << "Press Enter to continue to voting...";
+            cin.get();
+
+            // Now proceed to voting with the newly registered voter
+        }
+        else {
+            cout << "Invalid choice!\n";
             return;
         }
 
-        if (v->password != password) {
-            cout << "Error: Incorrect password!\n";
-            return;
-        }
+        // From here, continue with the existing voting flow
+        if (!v) return;
 
         cout << "\n" << string(50, '-') << "\n";
         cout << "Welcome, " << v->name << "!\n";
@@ -114,6 +173,7 @@ public:
             return;
         }
 
+        // ... rest of the existing voting code remains the same ...
         // Get candidates available in voter's polling station
         string voterStation = v->pollingStation;
         vector<string> stationCandidates = candidates.getCandidatesInStation(voterStation);
@@ -157,8 +217,6 @@ public:
             cout << "\nYou are voting for:\n";
             cout << "Name: " << candidate->name << "\n";
             cout << "Party: " << candidate->party << "\n";
-            cout << "Symbol: " << candidate->symbol << "\n";
-            cout << "Constituency: " << candidate->constituency << "\n";
             delete candidate;
         }
 
@@ -182,8 +240,8 @@ public:
     }
 
     // -------------------------------------------------
-    //                CANDIDATE VIEW (UPDATED)
-    // -------------------------------------------------
+//                CANDIDATE VIEW (UPDATED)
+// -------------------------------------------------
     void candidateView(CandidateBTree& candidates) {
         printHeader("CANDIDATE LOGIN");
 
@@ -210,9 +268,7 @@ public:
         cout << "Name: " << candidate->name << "\n";
         cout << "CNIC: " << candidate->cnic << "\n";
         cout << "Party: " << candidate->party << "\n";
-        cout << "Symbol: " << candidate->symbol << "\n";
         cout << "Polling Station: " << candidate->pollingStation << "\n";
-        cout << "Constituency: " << candidate->constituency << "\n";
         cout << "Current Votes: " << candidate->voteCount << "\n";
         delete candidate;
 
@@ -223,7 +279,7 @@ public:
         // Get current candidate to know their station
         CandidateNode* current = candidates.getCandidate(id);
         if (current) {
-            candidates.printCandidatesByStation(current->pollingStation);
+            candidates.printCandidatesByStation(string(current->pollingStation));
             delete current;
         }
 
@@ -231,6 +287,57 @@ public:
             cout << "\nVoting is still in progress.\n";
         else
             cout << "\nVoting has ended.\n";
+    }
+
+  // -------------------------------------------------
+//            CANDIDATE REGISTRATION VIEW (NEW)
+// -------------------------------------------------
+    // Add this to the public section of VotingManager class in voting_manager.h:
+    void candidateRegistrationView(CandidateBTree& candidates) {
+        printHeader("CANDIDATE REGISTRATION");
+
+        // Display available parties
+        candidates.displayAvailableParties();
+
+        cout << "\nIMPORTANT: You must have the party secret code to register as a candidate.\n";
+        cout << "If you're an independent candidate, use Party: 'Independent' and Secret Code: 'INDEP1234'\n";
+        cout << string(50, '-') << "\n";
+
+        string name, cnic, partyName, secretCode, pollingStation, password;
+
+        cout << "\nEnter your details:\n";
+        cout << "Full Name: ";
+        getline(cin, name);
+
+        cout << "CNIC (13 digits): ";
+        getline(cin, cnic);
+
+        cout << "Party Name (exactly as shown above): ";
+        getline(cin, partyName);
+
+        cout << "Party Secret Code: ";
+        getline(cin, secretCode);
+
+        cout << "Polling Station you want to contest from (e.g., KHI01, LHR01): ";
+        getline(cin, pollingStation);
+
+        cout << "Set your password for candidate login (min 6 characters): ";
+        getline(cin, password);
+
+        // Register candidate
+        bool success = candidates.registerCandidate(name, cnic, partyName,
+            secretCode, pollingStation,
+            password);
+
+        if (success) {
+            cout << "\n" << string(50, '=') << "\n";
+            cout << "  REGISTRATION SUCCESSFUL!\n";
+            cout << "You can now login as a candidate with your credentials.\n";
+            cout << string(50, '=') << "\n";
+        }
+        else {
+            cout << "\nRegistration failed. Please check your party details and try again.\n";
+        }
     }
 
     // -------------------------------------------------
@@ -285,39 +392,26 @@ private:
         int choice;
         do {
             printHeader("MANAGE VOTERS");
-            cout << "1. Add New Voter\n";
-            cout << "2. View All Voters\n";
-            cout << "3. Search Voter\n";
-            cout << "4. View by Polling Station\n";
-            cout << "5. View by Town\n";
-            cout << "6. View Voter Statistics\n";
+            cout << "1. View All Voters\n";
+            cout << "2. Search Voter\n";
+            cout << "3. View by Polling Station\n";
+            cout << "4. View by Town\n";
+            cout << "5. View Voter Statistics\n";
             cout << "0. Back\n";
             cout << "\nEnter choice: ";
             cin >> choice;
             clearInput();
 
             switch (choice) {
-            case 1: {
-                string name, cnic, gender, contact, town;
-                cout << "Enter Voter Name: "; getline(cin, name);
-                cout << "Enter CNIC (13 digits): "; getline(cin, cnic);
-                cout << "Enter Gender (Male/Female/Other): "; getline(cin, gender);
-                cout << "Enter Contact Number (11 digits starting with 03): "; getline(cin, contact);
-                cout << "Enter Town: "; getline(cin, town);
-
-                voters.insertVoter(name, cnic, gender, contact, town);
-                break;
-            }
-            case 2:
+            case 1:
                 printHeader("ALL VOTERS");
                 voters.printTable();
                 break;
-            case 3: {
+            case 2: {
                 int searchChoice;
                 cout << "Search by:\n";
                 cout << "1. Voter ID\n";
                 cout << "2. CNIC\n";
-                cout << "3. Username\n";
                 cout << "Choice: ";
                 cin >> searchChoice;
                 clearInput();
@@ -334,30 +428,24 @@ private:
                     Voter* v = voters.searchByCNIC(cnic);
                     displayVoterDetails(v);
                 }
-                else if (searchChoice == 3) {
-                    string username;
-                    cout << "Enter Username: "; getline(cin, username);
-                    Voter* v = voters.searchByUsername(username);
-                    displayVoterDetails(v);
-                }
                 else {
                     cout << "Invalid choice!\n";
                 }
                 break;
             }
-            case 4: {
+            case 3: {
                 string station;
                 cout << "Enter Polling Station ID: "; getline(cin, station);
                 voters.printVotersByStation(station);
                 break;
             }
-            case 5: {
+            case 4: {
                 string town;
                 cout << "Enter Town: "; getline(cin, town);
                 voters.printVotersByTown(town);
                 break;
             }
-            case 6:
+            case 5:
                 voters.printTownStatistics();
                 break;
             }
@@ -376,7 +464,6 @@ private:
             cout << "Contact:       " << v->contactNumber << "\n";
             cout << "Town:          " << v->town << "\n";
             cout << "Polling Station: " << v->pollingStation << "\n";
-            cout << "Username:      " << v->username << "\n";
             cout << "Voted:         " << (v->hasVoted ? "Yes" : "No") << "\n";
             cout << string(50, '-') << "\n";
         }
@@ -391,39 +478,20 @@ private:
     void adminManageCandidates(CandidateBTree& candidates) {
         int choice;
         do {
-            printHeader("MANAGE CANDIDATES");
-            cout << "1. Add New Candidate\n";
-            cout << "2. View All Candidates\n";
-            cout << "3. Search Candidate\n";
-            cout << "4. View Candidates by Station\n";
+            printHeader("MANAGE CANDIDATES");;
+            cout << "1. View All Candidates\n";
+            cout << "2. Search Candidate\n";
+            cout << "3. View Candidates by Station\n";
             cout << "0. Back\n";
             cout << "\nEnter choice: ";
             cin >> choice;
             clearInput();
 
             switch (choice) {
-            case 1: {
-                string name, cnic, party, symbol, station, constituency, password;
-                cout << "Enter Candidate Name: "; getline(cin, name);
-                cout << "Enter CNIC (13 digits): "; getline(cin, cnic);
-                cout << "Enter Party: "; getline(cin, party);
-                cout << "Enter Symbol: "; getline(cin, symbol);
-                cout << "Enter Polling Station (e.g., KHI01): "; getline(cin, station);
-                cout << "Enter Constituency: "; getline(cin, constituency);
-                cout << "Enter Password (optional): "; getline(cin, password);
-
-                // Generate candidate ID automatically
-                // Format: C + station + sequence (e.g., CKHI0101)
-                string candidateID = "C" + station + "01"; // Simple ID for now
-
-                candidates.insertCandidate(candidateID, name, cnic, party, symbol,
-                    station, constituency, password);
-                break;
-            }
-            case 2:
+            case 1:
                 candidates.printCandidatesTable();
                 break;
-            case 3: {
+            case 2: {
                 string id;
                 cout << "Enter Candidate ID: "; getline(cin, id);
                 CandidateNode* candidate = candidates.getCandidate(id);
@@ -435,9 +503,7 @@ private:
                     cout << "Name:         " << candidate->name << "\n";
                     cout << "CNIC:         " << candidate->cnic << "\n";
                     cout << "Party:        " << candidate->party << "\n";
-                    cout << "Symbol:       " << candidate->symbol << "\n";
                     cout << "Station:      " << candidate->pollingStation << "\n";
-                    cout << "Constituency: " << candidate->constituency << "\n";
                     cout << "Votes:        " << candidate->voteCount << "\n";
                     cout << string(50, '-') << "\n";
                     delete candidate;
@@ -447,7 +513,7 @@ private:
                 }
                 break;
             }
-            case 4: {
+            case 3: {
                 string station;
                 cout << "Enter Polling Station ID: "; getline(cin, station);
                 candidates.printCandidatesByStation(station);
