@@ -1,10 +1,12 @@
+// main.cpp
 #include <iostream>
 #include <string>
 #include <ctime>
 #include <limits>
 #include <iomanip>
+#include "config.h"
 #include "voter.h"
-#include "candidate.h"  
+#include "candidate.h"
 #include "voting_manager.h"
 using namespace std;
 
@@ -16,7 +18,6 @@ void clearInput() {
 void printMainMenu() {
     cout << "\n" << string(70, '=') << "\n";
     cout << "              ENHANCED ONLINE VOTING SYSTEM\n";
-    cout << "           (With Geographic Constituency System)\n";
     cout << string(70, '=') << "\n";
     cout << "1. Voter Login / Registration\n";
     cout << "2. Candidate Login / Registration\n";
@@ -27,8 +28,7 @@ void printMainMenu() {
     cout << "Enter your choice: ";
 }
 
-// Unified candidate login/registration menu
-void candidateLoginRegistration(CandidateBTree& candidates) {
+void candidateLoginRegistration(CandidateBTree& candidates, VotingManager& vm) {
     cout << "\n" << string(60, '=') << "\n";
     cout << "        CANDIDATE LOGIN / REGISTRATION\n";
     cout << string(60, '=') << "\n";
@@ -43,17 +43,14 @@ void candidateLoginRegistration(CandidateBTree& candidates) {
     clearInput();
 
     switch (choice) {
-    case 1: // Candidate Login
-        // This will be handled by voting_manager.cpp
+    case 1: 
+        vm.candidateView(candidates);
         break;
-    case 2: // Candidate Registration
+    case 2: 
     {
         cout << "\n" << string(70, '=') << "\n";
         cout << "          CANDIDATE REGISTRATION PORTAL\n";
         cout << string(70, '=') << "\n";
-
-        // First, show available parties
-        candidates.displayAvailableParties();
 
         cout << "\nIMPORTANT: You must have the party secret code to register as a candidate.\n";
         cout << "If you're an independent candidate, use Party: 'IND' and Secret Code: 'INDEP1234'\n";
@@ -128,6 +125,7 @@ void printPublicInfo(CandidateBTree& candidates, VoterHashTable& voters, VotingM
     cout << "\n" << string(70, '=') << "\n";
     cout << "              PUBLIC INFORMATION PORTAL\n";
     cout << string(70, '=') << "\n";
+    candidates.printCandidatesTable();
 
     cout << "\nVOTER STATISTICS:\n";
     cout << string(40, '-') << "\n";
@@ -158,10 +156,8 @@ void printPublicInfo(CandidateBTree& candidates, VoterHashTable& voters, VotingM
         cout << "... and " << (stations.size() - 10) << " more\n";
     }
 
-    // Show available parties
     cout << "\nREGISTERED POLITICAL PARTIES:\n";
     cout << string(40, '-') << "\n";
-    candidates.displayAvailableParties();
 
     cout << "\n" << string(70, '=') << "\n";
     cout << "IMPORTANT NOTES:\n";
@@ -172,97 +168,26 @@ void printPublicInfo(CandidateBTree& candidates, VoterHashTable& voters, VotingM
     cout << string(70, '=') << "\n";
 }
 
-// Updated helper function for demo data - only adds if file is empty
-void addDemoData(VoterHashTable& voters, CandidateBTree& candidates) {
-    // Check if we already have data
-    int existingVoters = voters.getTotalVoters();
-
-    if (existingVoters == 0) {
-        cout << "\nNo existing voter data found. Adding demo data...\n";
-
-        // Add some demo voters with passwords
-        voters.insertVoter("Ali Khan", "3520277777701", "M", "03123456789", "Karachi", "pass111");
-        voters.insertVoter("Sara Ahmed", "3520277777702", "F", "03219876543", "Lahore", "pass222");
-        voters.insertVoter("Bilal Shah", "3520277777703", "M", "03331234567", "Islamabad", "pass333");
-        voters.insertVoter("Fatima Malik", "3520277777704", "F", "03451234567", "Karachi", "pass444");
-        voters.insertVoter("Usman Raza", "3520277777705", "M", "03561234567", "Lahore", "pass555");
-        voters.insertVoter("Alex Taylor", "3520277777706", "O", "03661234567", "Islamabad", "pass666");
-
-        cout << "Demo voters added successfully!\n";
-    }
-    else {
-        cout << "\nFound " << existingVoters << " existing voters in database.\n";
-    }
-
-    // Add demo candidates using the new registration system
-    cout << "\nChecking for existing candidates...\n";
-
-    // Test if we have candidates by trying to display parties
-    vector<string> parties = candidates.getAllParties();
-    if (parties.empty()) {
-        cout << "No existing candidates found. Adding demo candidates...\n";
-
-        // Using direct insertion for demo (bypassing secret code for testing)
-        // Note: Using the correct insertCandidate signature
-        candidates.insertCandidate("CID00001", "Imran Khan", "4220100012345",
-            "PTI", "KHI01", "pti123");
-        candidates.insertCandidate("CID00002", "Bilawal Bhutto", "4220100023456",
-            "PPP", "KHI01", "ppp123");
-        candidates.insertCandidate("CID00003", "Nawaz Sharif", "4220100034567",
-            "PMLN", "LHR01", "pmln123");
-        candidates.insertCandidate("CID00004", "Asad Qaiser", "4220100045678",
-            "PTI", "ISB01", "pti456");
-        candidates.insertCandidate("CID00005", "Independent Candidate", "4220100056789",
-            "IND", "KHI02", "indep123");
-
-        cout << "Demo candidates added successfully!\n";
-    }
-    else {
-        cout << "Found existing candidates in database.\n";
-    }
-
-    cout << "\nTest Credentials:\n";
-    cout << "===================\n";
-    cout << "VOTER:\n";
-    cout << "CNIC: 4220112345678\n";
-    cout << "Password: password123\n";
-    cout << "\nCANDIDATES:\n";
-    cout << "Imran Khan - ID: CID00001, Password: pti123\n";
-    cout << "Bilawal Bhutto - ID: CID00002, Password: ppp123\n";
-    cout << "Nawaz Sharif - ID: CID00003, Password: pmln123\n";
-    cout << "Asad Qaiser - ID: CID00004, Password: pti456\n";
-    cout << "Independent Candidate - ID: CID00005, Password: indep123\n";
-    cout << "\nADMIN:\n";
-    cout << "Password: admin123\n";
-    cout << "===================\n";
-}
-
 int main() {
-    // Initialize with larger hash table for more voters
-    VoterHashTable voters(50);
+    VoterHashTable voters(DEFAULT_HASH_TABLE_SIZE);
     CandidateBTree candidates;
-    VotingManager vm(120); // 2 minutes default voting duration
+    VotingManager vm(DEFAULT_VOTING_DURATION); 
 
-    // Welcome message
-    cout << "\n" << string(80, '*') << "\n";
-    cout << "          WELCOME TO ENHANCED ONLINE VOTING SYSTEM\n";
-    cout << "               (Geographic Constituency Based)\n";
-    cout << string(80, '*') << "\n";
-    cout << "\nSystem Features:\n";
-    cout << "1. Voter registration with full details (CNIC, Contact, Town)\n";
-    cout << "2. Auto-generated Voter IDs (VID00001 format)\n";
-    cout << "3. Candidate registration with party secret codes\n";
-    cout << "4. Auto-generated Candidate IDs (CID00001 format)\n";
-    cout << "5. Polling station assignment based on town\n";
-    cout << "6. Candidates contest from specific polling stations\n";
-    cout << "7. Voters can only vote for candidates in their station\n";
-    cout << "8. Party-based candidate registration with secret codes\n";
-    cout << "9. Geographic statistics and reports\n";
-    cout << "10. Secure login for voters, candidates, and admin\n";
-    cout << string(80, '*') << "\n\n";
+    cout << "Initializing B-tree...\n";
 
-    // Add demo data only if file is empty
-    addDemoData(voters, candidates);
+    // Test if tree is empty first
+    if (candidates.isEmpty()) {
+        cout << "B-tree is empty, ready for use.\n";
+    }
+    else {
+        cout << "B-tree has data, debugging structure...\n";
+        candidates.debugPrintTree();
+    }
+
+    cout << "Testing B-tree...\n";
+    candidates.debugPrintTree();
+
+    cout << " WELCOME TO ONLINE VOTING SYSTEM\n";
 
     int choice;
 
@@ -277,7 +202,7 @@ int main() {
             break;
 
         case 2: // Candidate Login / Registration
-            candidateLoginRegistration(candidates);
+            candidateLoginRegistration(candidates, vm);
             break;
 
         case 3: // Admin Login
@@ -295,7 +220,7 @@ int main() {
             cout << "           System shutting down...\n";
             cout << string(60, '=') << "\n";
 
-            // Show final statistics - variables declared inside case block
+            // Show final statistics
             cout << "\nFINAL SYSTEM STATISTICS:\n";
             cout << string(40, '-') << "\n";
             int totalVoters = voters.getTotalVoters();
@@ -308,15 +233,15 @@ int main() {
             }
 
             // Show candidate count
-            cout << "\nCANDIDATE STATISTICS:\n";
+         /*   cout << "\nCANDIDATE STATISTICS:\n";
             cout << string(30, '-') << "\n";
-            vector<string> parties = candidates.getAllParties();
+            vector<string> parties = candidates.printFilteredCandidates();
             cout << "Registered Parties: " << parties.size() << "\n";
             if (!parties.empty()) {
                 for (const string& party : parties) {
                     cout << "  - " << party << "\n";
                 }
-            }
+            }*/
 
             cout << string(40, '-') << "\n";
             cout << "\nData saved successfully. Goodbye!\n";

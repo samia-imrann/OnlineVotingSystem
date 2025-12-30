@@ -6,6 +6,7 @@
 #include <string>
 #include <iomanip>
 #include <limits>
+#include "config.h"
 #include "candidate.h"
 #include "voter.h"
 using namespace std;
@@ -29,7 +30,7 @@ private:
     }
 
 public:
-    VotingManager(int duration = 300, string adminPass = "admin123") {
+    VotingManager(int duration = DEFAULT_VOTING_DURATION, string adminPass = DEFAULT_ADMIN_PASSWORD) {
         durationSeconds = duration;
         votingActive = false;
         adminPassword = adminPass;
@@ -67,12 +68,212 @@ public:
         return true;
     }
 
-    // -------------------------------------------------
-    //                   VOTER VIEW (UPDATED)
-    // -------------------------------------------------
+    void showVoterDashboard(Voter* v, VoterHashTable& voters, CandidateBTree& candidates) {
+        bool logout = false;
+        while (!logout) {
+            printHeader("VOTER DASHBOARD");
+            cout << "Welcome, " << v->name << "!\n";
+            cout << "Voter ID: " << v->voterID << "\n";
+            if (v->hasVoted) {
+                cout << "Status: Already Voted\n";
+            }
+            else {
+                cout << "Status: Not Voted Yet\n";
+            }
+            cout << string(50, '-') << "\n\n";
+
+            int choice;
+            cout << "1. View Profile\n";
+            cout << "2. Cast Vote\n";
+            cout << "3. View Result\n";
+            cout << "4. Update Password\n";
+            cout << "5. Logout\n";
+            cout << "Enter your choice: ";
+            cin >> choice;
+            clearInput();
+
+            switch (choice) {
+            case 1: {
+                voters.viewProfile(v);
+                cout << "\nPress Enter to continue...";
+                cin.get();
+                break;
+            }
+            case 2: {
+                if (v->hasVoted) {
+                    cout << "You have already voted!\n";
+                    cout << "Press Enter to continue...";
+                    cin.get();
+                    break;
+                }
+
+                if (!canVote()) {
+                    cout << "Voting is not allowed at this time.\n";
+                    cout << "Press Enter to continue...";
+                    cin.get();
+                    break;
+                }
+
+                // Fix: Declare these variables locally
+                string voterStation = v->pollingStation;
+
+                // Get candidates in the voter's polling station
+                // First, get all candidates and filter by station
+                vector<string> stationCandidates;
+
+                // We need a way to get candidates by station - let's add a helper method
+                // For now, we'll use a workaround
+                printHeader("CANDIDATES IN YOUR POLLING STATION");
+                cout << "Candidates contesting from Station: " << voterStation << "\n";
+                cout << string(80, '-') << "\n";
+
+                // Display candidates from this station
+                candidates.printCandidatesByStation(voterStation);
+
+                // Since we can't easily get candidate IDs by station, we'll prompt directly
+                cout << "\nEnter Candidate ID to vote for: ";
+                string candidateID;
+                getline(cin, candidateID);
+
+                // Check if candidate exists and is in the right station
+                CandidateNode* candidate = candidates.getCandidate(candidateID);
+                if (!candidate) {
+                    cout << "Error: Candidate not found!\n";
+                    cout << "Press Enter to continue...";
+                    cin.get();
+                    break;
+                }
+
+                // Check if candidate is in the voter's polling station
+                if (string(candidate->pollingStation) != voterStation) {
+                    cout << "Error: Candidate " << candidateID << " is not contesting in your polling station!\n";
+                    cout << "You can only vote for candidates in Station: " << voterStation << "\n";
+                    cout << "Candidate's station: " << candidate->pollingStation << "\n";
+                    delete candidate;
+                    cout << "Press Enter to continue...";
+                    cin.get();
+                    break;
+                }
+
+                cout << "\nYou are voting for:\n";
+                cout << "Name: " << candidate->name << "\n";
+                cout << "Party: " << candidate->party << "\n";
+                delete candidate;
+
+                cout << "\nConfirm vote for candidate " << candidateID << "? (yes/no): ";
+                string confirm;
+                getline(cin, confirm);
+
+                if (confirm == "yes" || confirm == "y" || confirm == "Y") {
+                    candidates.voteCandidate(candidateID);
+                    voters.markAsVoted(v->voterID);
+                    v->hasVoted = true;
+
+                    cout << "\n" << string(50, '*') << "\n";
+                    cout << "    VOTE CAST SUCCESSFULLY!\n";
+                    cout << string(50, '*') << "\n";
+                    cout << "Thank you for voting, " << v->name << "!\n";
+                    cout << "Your vote has been recorded.\n";
+                }
+                else {
+                    cout << "\nVote cancelled.\n";
+                }
+                cout << "Press Enter to continue...";
+                cin.get();
+                break;
+            }
+            case 3: {
+                cout << "Will Implement - View Result\n";
+                cout << "Press Enter to continue...";
+                cin.get();
+                break;
+            }
+            case 4: {
+                printHeader("UPDATE PASSWORD");
+
+                string oldPass, newPass, confirmPass;
+
+                // Step 1: Verify old password
+                cout << "Enter your current password: ";
+                getline(cin, oldPass);
+
+                if (oldPass != v->password) {
+                    cout << "Error: Incorrect current password!\n";
+                    cout << "Press Enter to continue...";
+                    cin.get();
+                    break;
+                }
+
+                // Step 2: Get new password with validation
+                bool validPassword = false;
+                int attempts = 0;
+                const int MAX_ATTEMPTS = 3;
+
+                while (!validPassword && attempts < MAX_ATTEMPTS) {
+                    cout << "Enter new password (min 6 characters): ";
+                    getline(cin, newPass);
+
+                    if (newPass.length() < 6) {
+                        cout << "Error: Password must be at least 6 characters long!\n";
+                        attempts++;
+                        continue;
+                    }
+
+                    // Step 3: Confirm new password
+                    cout << "Confirm new password: ";
+                    getline(cin, confirmPass);
+
+                    if (newPass != confirmPass) {
+                        cout << "Error: Passwords do not match! Please try again.\n";
+                        attempts++;
+                    }
+                    else {
+                        validPassword = true;
+                    }
+                }
+
+                if (!validPassword) {
+                    cout << "Too many failed attempts. Password update cancelled.\n";
+                    cout << "Press Enter to continue...";
+                    cin.get();
+                    break;
+                }
+
+                // Step 4: Update password using the function
+                bool updated = voters.updatePassword(v->voterID, newPass);
+
+                if (updated) {
+                    cout << "\n" << string(50, '=') << "\n";
+                    cout << "    PASSWORD UPDATED SUCCESSFULLY!\n";
+                    cout << string(50, '=') << "\n";
+                    cout << "Your password has been changed.\n";
+                    cout << "Please use the new password for future logins.\n";
+                }
+                else {
+                    cout << "Error: Failed to update password!\n";
+                }
+
+                cout << "Press Enter to continue...";
+                cin.get();
+                break;
+            }
+            case 5: {
+                logout = true;
+                cout << "Logging out...\n";
+                break;
+            }
+            default: {
+                cout << "Invalid choice! Please try again.\n";
+                cout << "Press Enter to continue...";
+                cin.get();
+                break;
+            }
+            }
+        }
+    }
+
     void voterView(VoterHashTable& voters, CandidateBTree& candidates) {
         printHeader("VOTER LOGIN / REGISTRATION");
-
         int choice;
         cout << "1. Login (Already Registered)\n";
         cout << "2. Register (New Voter)\n";
@@ -83,16 +284,14 @@ public:
         Voter* v = nullptr;
 
         if (choice == 1) {
-            // Login flow
+            // LOGIN FLOW
             printHeader("VOTER LOGIN");
-
             string vid, password;
             cout << "Enter your ID (or CNIC): ";
             getline(cin, vid);
             cout << "Enter Password: ";
             getline(cin, password);
 
-            // Try searching by id first
             v = voters.searchForLogin(vid);
             if (!v && voters.searchByCNIC(vid) != nullptr) {
                 v = voters.searchByCNIC(vid);
@@ -107,9 +306,12 @@ public:
                 cout << "Error: Incorrect password!\n";
                 return;
             }
+
+            // Show dashboard for logged in user
+            showVoterDashboard(v, voters, candidates);
         }
         else if (choice == 2) {
-            // Registration flow
+            // REGISTRATION FLOW
             printHeader("NEW VOTER REGISTRATION");
 
             string name, cnic, gender, contact, town, password;
@@ -126,10 +328,8 @@ public:
             cout << "Enter Password (min 6 characters): ";
             getline(cin, password);
 
-            // Register the voter
-            voters.insertVoter(name, cnic, gender, contact, town,password);
+            voters.insertVoter(name, cnic, gender, contact, town, password);
 
-            // Get the newly created voter
             v = voters.searchByCNIC(cnic);
             if (!v) {
                 cout << "Registration failed! Please try again.\n";
@@ -144,104 +344,19 @@ public:
             cout << "Please remember these credentials for login.\n";
             cout << string(50, '=') << "\n\n";
 
-            cout << "Press Enter to continue to voting...";
+            cout << "You are now automatically logged in!\n";
+            cout << "Press Enter to continue to dashboard...";
             cin.get();
 
-            // Now proceed to voting with the newly registered voter
+            // Show dashboard for newly registered user
+            showVoterDashboard(v, voters, candidates);
         }
         else {
             cout << "Invalid choice!\n";
             return;
         }
-
-        // From here, continue with the existing voting flow
-        if (!v) return;
-
-        cout << "\n" << string(50, '-') << "\n";
-        cout << "Welcome, " << v->name << "!\n";
-        cout << "Voter ID: " << v->voterID << "\n";
-        cout << "Polling Station: " << v->pollingStation << "\n";
-        cout << "Town: " << v->town << "\n";
-        cout << string(50, '-') << "\n";
-
-        if (!canVote()) {
-            return;
-        }
-
-        if (v->hasVoted) {
-            cout << "You have already voted!\n";
-            return;
-        }
-
-        // ... rest of the existing voting code remains the same ...
-        // Get candidates available in voter's polling station
-        string voterStation = v->pollingStation;
-        vector<string> stationCandidates = candidates.getCandidatesInStation(voterStation);
-
-        if (stationCandidates.empty()) {
-            cout << "No candidates available in your polling station (" << voterStation << ").\n";
-            return;
-        }
-
-        printHeader("CANDIDATES IN YOUR POLLING STATION");
-        candidates.printFilteredCandidates(stationCandidates);
-
-        cout << "\nEnter Candidate ID to vote for: ";
-        string candidateID;
-        getline(cin, candidateID);
-
-        // Check if candidate is in voter's polling station
-        bool validCandidate = false;
-        for (const string& id : stationCandidates) {
-            if (id == candidateID) {
-                validCandidate = true;
-                break;
-            }
-        }
-
-        if (!validCandidate) {
-            cout << "Error: Candidate " << candidateID << " is not contesting in your polling station!\n";
-            cout << "You can only vote for candidates in Station: " << voterStation << "\n";
-            return;
-        }
-
-        int found = candidates.searchCandidate(candidateID);
-        if (found == -1) {
-            cout << "Error: Candidate not found!\n";
-            return;
-        }
-
-        // Show candidate details
-        CandidateNode* candidate = candidates.getCandidate(candidateID);
-        if (candidate) {
-            cout << "\nYou are voting for:\n";
-            cout << "Name: " << candidate->name << "\n";
-            cout << "Party: " << candidate->party << "\n";
-            delete candidate;
-        }
-
-        cout << "\nConfirm vote for candidate " << candidateID << "? (yes/no): ";
-        string confirm;
-        getline(cin, confirm);
-
-        if (confirm == "yes" || confirm == "y" || confirm == "Y") {
-            candidates.voteCandidate(candidateID);
-            voters.markAsVoted(v->voterID);
-
-            cout << "\n" << string(50, '*') << "\n";
-            cout << "    VOTE CAST SUCCESSFULLY!\n";
-            cout << string(50, '*') << "\n";
-            cout << "Thank you for voting, " << v->name << "!\n";
-            cout << "Your vote has been recorded.\n";
-        }
-        else {
-            cout << "\nVote cancelled.\n";
-        }
     }
 
-    // -------------------------------------------------
-//                CANDIDATE VIEW (UPDATED)
-// -------------------------------------------------
     void candidateView(CandidateBTree& candidates) {
         printHeader("CANDIDATE LOGIN");
 
@@ -276,7 +391,6 @@ public:
         cout << "OTHER CANDIDATES IN YOUR POLLING STATION:\n";
         cout << string(50, '-') << "\n";
 
-        // Get current candidate to know their station
         CandidateNode* current = candidates.getCandidate(id);
         if (current) {
             candidates.printCandidatesByStation(string(current->pollingStation));
@@ -289,18 +403,11 @@ public:
             cout << "\nVoting has ended.\n";
     }
 
-  // -------------------------------------------------
-//            CANDIDATE REGISTRATION VIEW (NEW)
-// -------------------------------------------------
-    // Add this to the public section of VotingManager class in voting_manager.h:
     void candidateRegistrationView(CandidateBTree& candidates) {
         printHeader("CANDIDATE REGISTRATION");
 
-        // Display available parties
-        candidates.displayAvailableParties();
-
         cout << "\nIMPORTANT: You must have the party secret code to register as a candidate.\n";
-        cout << "If you're an independent candidate, use Party: 'Independent' and Secret Code: 'INDEP1234'\n";
+        cout << "If you're an independent candidate, use Party: 'IND' and Secret Code: 'INDEP1234'\n";
         cout << string(50, '-') << "\n";
 
         string name, cnic, partyName, secretCode, pollingStation, password;
@@ -324,7 +431,6 @@ public:
         cout << "Set your password for candidate login (min 6 characters): ";
         getline(cin, password);
 
-        // Register candidate
         bool success = candidates.registerCandidate(name, cnic, partyName,
             secretCode, pollingStation,
             password);
@@ -340,9 +446,6 @@ public:
         }
     }
 
-    // -------------------------------------------------
-    //                ADMIN VIEW
-    // -------------------------------------------------
     void adminView(VoterHashTable& voters, CandidateBTree& candidates) {
         printHeader("ADMIN LOGIN");
 
@@ -385,9 +488,6 @@ public:
     }
 
 private:
-    // -------------------------------------------------
-    //            ADMIN — MANAGE VOTERS (UPDATED)
-    // -------------------------------------------------
     void adminManageVoters(VoterHashTable& voters, CandidateBTree& candidates) {
         int choice;
         do {
@@ -459,6 +559,7 @@ private:
             cout << string(50, '-') << "\n";
             cout << "Voter ID:      " << v->voterID << "\n";
             cout << "Name:          " << v->name << "\n";
+            cout << "Password: " << v->password << "\n";
             cout << "CNIC:          " << v->cnic << "\n";
             cout << "Gender:        " << v->gender << "\n";
             cout << "Contact:       " << v->contactNumber << "\n";
@@ -472,16 +573,15 @@ private:
         }
     }
 
-    // -------------------------------------------------
-    //          ADMIN — MANAGE CANDIDATES (UPDATED)
-    // -------------------------------------------------
     void adminManageCandidates(CandidateBTree& candidates) {
         int choice;
         do {
-            printHeader("MANAGE CANDIDATES");;
+            printHeader("MANAGE CANDIDATES");
             cout << "1. View All Candidates\n";
             cout << "2. Search Candidate\n";
             cout << "3. View Candidates by Station\n";
+            cout << "4: View All Candidates (Brute-force)\n";
+            cout << "5. Rebuild/Verify B-tree\n";
             cout << "0. Back\n";
             cout << "\nEnter choice: ";
             cin >> choice;
@@ -519,13 +619,14 @@ private:
                 candidates.printCandidatesByStation(station);
                 break;
             }
+            case 4: {
+                candidates.printAllCandidatesBruteForce();
+                break;
+            }
             }
         } while (choice != 0);
     }
 
-    // -------------------------------------------------
-    //               ADMIN — VOTING CONTROL
-    // -------------------------------------------------
     void adminVotingControl(VoterHashTable& voters, CandidateBTree& candidates) {
         int choice;
         do {
@@ -585,9 +686,6 @@ private:
         } while (choice != 0);
     }
 
-    // -------------------------------------------------
-    //            ADMIN — SYSTEM STATISTICS (UPDATED)
-    // -------------------------------------------------
     void adminViewStatistics(VoterHashTable& voters, CandidateBTree& candidates) {
         printHeader("SYSTEM STATISTICS");
 
@@ -622,16 +720,12 @@ private:
         candidates.printCandidatesTable();
     }
 
-    // -------------------------------------------------
-    //            ADMIN — GEOGRAPHIC REPORTS (NEW)
-    // -------------------------------------------------
     void adminGeographicReports(VoterHashTable& voters, CandidateBTree& candidates) {
         int choice;
         do {
             printHeader("GEOGRAPHIC REPORTS");
             cout << "1. Town-wise Voter Statistics\n";
             cout << "2. Polling Station Reports\n";
-            cout << "3. Constituency-wise Candidates\n";
             cout << "0. Back\n";
             cout << "\nEnter choice: ";
             cin >> choice;
@@ -650,32 +744,15 @@ private:
                 for (const string& station : stations) {
                     cout << "\nStation: " << station << "\n";
                     cout << string(40, '-') << "\n";
-
-                    // Count voters in this station
-                    int stationVoters = 0;
-                    int stationVoted = 0;
-                    for (int i = 0; i < voters.getTotalVoters(); i++) {
-                        // This is simplified - need to implement proper station counting
-                    }
-
                     cout << "Candidates in this station:\n";
                     candidates.printCandidatesByStation(station);
                 }
-                break;
-            }
-            case 3: {
-                // Get unique constituencies from candidates
-                cout << "\nConstituency Report\n";
-                cout << "Note: Implement constituency tracking in CandidateBTree\n";
                 break;
             }
             }
         } while (choice != 0);
     }
 
-    // -------------------------------------------------
-    //             ADMIN — SYSTEM RESET
-    // -------------------------------------------------
     void adminSystemReset(VoterHashTable& voters, CandidateBTree& candidates) {
         printHeader("SYSTEM RESET - WARNING!");
         cout << "This will reset all votes and voting status!\n";
@@ -699,9 +776,6 @@ private:
     }
 
 public:
-    // -------------------------------------------------
-    //              FINAL RESULTS
-    // -------------------------------------------------
     void showResults(CandidateBTree& candidates) {
         if (votingActive) {
             cout << "\nVoting is still in progress!\n";
@@ -715,4 +789,4 @@ public:
     }
 };
 
-#endif // VOTING_MANAGER_H
+#endif

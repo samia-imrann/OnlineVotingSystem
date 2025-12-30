@@ -127,6 +127,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="candidate.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="disk_manager.h" />
     <ClInclude Include="voter.h" />
     <ClInclude Include="voting_manager.h" />
   </ItemGroup>
