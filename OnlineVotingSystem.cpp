@@ -1,4 +1,4 @@
-// main.cpp
+// OnlineVotingSystem.cpp
 #include <iostream>
 #include <string>
 #include <ctime>
@@ -28,103 +28,50 @@ void printMainMenu() {
     cout << "Enter your choice: ";
 }
 
+// UPDATED: Simplified candidateLoginRegistration function
 void candidateLoginRegistration(CandidateBTree& candidates, VotingManager& vm) {
-    cout << "\n" << string(60, '=') << "\n";
-    cout << "        CANDIDATE LOGIN / REGISTRATION\n";
-    cout << string(60, '=') << "\n";
-    cout << "1. Login (Existing Candidate)\n";
-    cout << "2. Register (New Candidate)\n";
-    cout << "0. Back to Main Menu\n";
-    cout << string(60, '=') << "\n";
-    cout << "Enter your choice: ";
-
     int choice;
-    cin >> choice;
-    clearInput();
 
-    switch (choice) {
-    case 1: 
-        vm.candidateView(candidates);
-        break;
-    case 2: 
-    {
-        cout << "\n" << string(70, '=') << "\n";
-        cout << "          CANDIDATE REGISTRATION PORTAL\n";
-        cout << string(70, '=') << "\n";
+    do {
+        cout << "\n" << string(60, '=') << "\n";
+        cout << "        CANDIDATE LOGIN / REGISTRATION\n";
+        cout << string(60, '=') << "\n";
+        cout << "1. Login (Existing Candidate)\n";
+        cout << "2. Register (New Candidate)\n";
+        cout << "0. Back to Main Menu\n";
+        cout << string(60, '=') << "\n";
+        cout << "Enter your choice: ";
 
-        cout << "\nIMPORTANT: You must have the party secret code to register as a candidate.\n";
-        cout << "If you're an independent candidate, use Party: 'IND' and Secret Code: 'INDEP1234'\n";
-        cout << string(50, '-') << "\n";
+        cin >> choice;
+        clearInput();
 
-        string name, cnic, partyName, secretCode, pollingStation, password, confirmPassword;
-
-        cout << "\nEnter your details:\n";
-        cout << "Full Name: ";
-        getline(cin, name);
-
-        cout << "CNIC (13 digits): ";
-        getline(cin, cnic);
-
-        cout << "Party Name (exactly as shown above): ";
-        getline(cin, partyName);
-
-        cout << "Party Secret Code: ";
-        getline(cin, secretCode);
-
-        cout << "Polling Station you want to contest from (e.g., KHI01, LHR01): ";
-        getline(cin, pollingStation);
-
-        cout << "Set your password for candidate login (min 6 characters): ";
-        getline(cin, password);
-
-        cout << "Confirm password: ";
-        getline(cin, confirmPassword);
-
-        if (password != confirmPassword) {
-            cout << "\nError: Passwords do not match!\n";
+        switch (choice) {
+        case 1:
+            vm.candidateView(candidates);
+            break;
+        case 2:
+            // Use the updated registration view from VotingManager
+            vm.candidateRegistrationView(candidates);
+            break;
+        case 0:
             return;
+        default:
+            cout << "\nInvalid choice! Please try again.\n";
         }
 
-        // Show summary
-        cout << "\n" << string(50, '-') << "\n";
-        cout << "Registration Summary:\n";
-        cout << "Name: " << name << "\n";
-        cout << "CNIC: " << cnic << "\n";
-        cout << "Party: " << partyName << "\n";
-        cout << "Polling Station: " << pollingStation << "\n";
-        cout << string(50, '-') << "\n";
-
-        cout << "\nConfirm registration? (yes/no): ";
-        string confirm;
-        getline(cin, confirm);
-
-        if (confirm == "yes" || confirm == "y" || confirm == "Y") {
-            bool success = candidates.registerCandidate(name, cnic, partyName,
-                secretCode, pollingStation,
-                password);
-            if (!success) {
-                cout << "\nRegistration failed. Please check your party details and try again.\n";
-            }
-            else {
-                cout << "\nRegistration successful! You can now login with your Candidate ID and password.\n";
-            }
+        if (choice != 0) {
+            cout << "\nPress Enter to continue...";
+            cin.get();
         }
-        else {
-            cout << "\nRegistration cancelled.\n";
-        }
-        break;
-    }
-    case 0:
-        return;
-    default:
-        cout << "\nInvalid choice!\n";
-    }
+    } while (choice != 0);
 }
 
 void printPublicInfo(CandidateBTree& candidates, VoterHashTable& voters, VotingManager& vm) {
     cout << "\n" << string(70, '=') << "\n";
     cout << "              PUBLIC INFORMATION PORTAL\n";
     cout << string(70, '=') << "\n";
+
+    // Show candidate information
     candidates.printCandidatesTable();
 
     cout << "\nVOTER STATISTICS:\n";
@@ -139,55 +86,74 @@ void printPublicInfo(CandidateBTree& candidates, VoterHashTable& voters, VotingM
     }
 
     // Get all towns and stations
-    vector<string> towns = voters.getAllTowns();
+    vector<string> towns = GeographicConfig::getAllTowns();
     vector<string> stations = voters.getAllPollingStations();
 
     cout << "\nGEOGRAPHIC DISTRIBUTION:\n";
     cout << string(40, '-') << "\n";
-    cout << "Towns Registered: " << towns.size() << "\n";
-    cout << "Polling Stations Active: " << stations.size() << "\n";
+    cout << "Available Towns: " << towns.size() << "\n";
+    cout << "Registered Towns: " << voters.getAllTowns().size() << "\n";
+    cout << "Active Polling Stations: " << stations.size() << "\n";
 
-    cout << "\nAVAILABLE POLLING STATIONS (first 10):\n";
+    cout << "\nAVAILABLE TOWNS FOR REGISTRATION:\n";
     cout << string(40, '-') << "\n";
-    for (size_t i = 0; i < stations.size() && i < 10; i++) {
-        cout << i + 1 << ". " << stations[i] << "\n";
+    for (size_t i = 0; i < towns.size() && i < 15; i++) {
+        cout << i + 1 << ". " << towns[i] << "\n";
     }
-    if (stations.size() > 10) {
-        cout << "... and " << (stations.size() - 10) << " more\n";
+    if (towns.size() > 15) {
+        cout << "... and " << (towns.size() - 15) << " more\n";
     }
 
     cout << "\nREGISTERED POLITICAL PARTIES:\n";
     cout << string(40, '-') << "\n";
+    for (const auto& party : PARTY_SECRET_CODES) {
+        cout << " - " << party.first << "\n";
+    }
+
+    cout << "\nIMPORTANT ELECTION RULES:\n";
+    cout << string(40, '-') << "\n";
+    cout << "1. Only one candidate per party per polling station\n";
+    cout << "2. Polling stations are assigned based on town\n";
+    cout << "3. Voters can only vote for candidates in their polling station\n";
+    cout << "4. Candidates must have valid party secret code\n";
 
     cout << "\n" << string(70, '=') << "\n";
-    cout << "IMPORTANT NOTES:\n";
-    cout << "1. Voters can only vote for candidates in their assigned polling station.\n";
-    cout << "2. Candidates must be registered with a valid party secret code.\n";
-    cout << "3. Login with your Voter ID/CNIC and password to vote.\n";
-    cout << "4. Candidates can login to view their profile and station competitors.\n";
+    cout << "NOTES:\n";
+    cout << "- Voters login with Voter ID/CNIC and password\n";
+    cout << "- Candidates login with Candidate ID and password\n";
+    cout << "- Admin login requires admin password\n";
     cout << string(70, '=') << "\n";
 }
 
 int main() {
+
+        cout << "\n" << string(70, '=') << "\n";
+    cout << "         ENHANCED ONLINE VOTING SYSTEM\n";
+    cout << "              TOWN-BASED VOTING SYSTEM\n";
+    cout << string(70, '=') << "\n\n";
+
+    cout << "Initializing system components...\n";
+
     VoterHashTable voters(DEFAULT_HASH_TABLE_SIZE);
     CandidateBTree candidates;
-    VotingManager vm(DEFAULT_VOTING_DURATION); 
+    VotingManager vm(DEFAULT_VOTING_DURATION);
 
-    cout << "Initializing B-tree...\n";
 
     // Test if tree is empty first
     if (candidates.isEmpty()) {
-        cout << "B-tree is empty, ready for use.\n";
+        cout << "Candidate database is empty, ready for registrations.\n";
     }
     else {
-        cout << "B-tree has data, debugging structure...\n";
-        candidates.debugPrintTree();
+        int candidateCount = candidates.getCandidateCount();
+        cout << "Loaded " << candidateCount << " candidates from database.\n";
     }
 
-    cout << "Testing B-tree...\n";
-    candidates.debugPrintTree();
-
-    cout << " WELCOME TO ONLINE VOTING SYSTEM\n";
+    // Show available towns
+    vector<string> towns = GeographicConfig::getAllTowns();
+    cout << "\nAvailable Towns in the System: " << towns.size() << "\n";
+    for (const auto& town : towns) {
+        cout << "  - " << town << "\n";
+    }
 
     int choice;
 
@@ -232,19 +198,17 @@ int main() {
                 cout << "Final Turnout: " << fixed << setprecision(1) << turnout << "%\n";
             }
 
-            // Show candidate count
-         /*   cout << "\nCANDIDATE STATISTICS:\n";
-            cout << string(30, '-') << "\n";
-            vector<string> parties = candidates.printFilteredCandidates();
-            cout << "Registered Parties: " << parties.size() << "\n";
-            if (!parties.empty()) {
-                for (const string& party : parties) {
-                    cout << "  - " << party << "\n";
-                }
-            }*/
+            int candidateCount = candidates.getCandidateCount();
+            cout << "Total Candidates Registered: " << candidateCount << "\n";
+
+            vector<string> registeredTowns = voters.getAllTowns();
+            cout << "Towns with Registered Voters: " << registeredTowns.size() << "\n";
+
+            vector<string> activeStations = voters.getAllPollingStations();
+            cout << "Active Polling Stations: " << activeStations.size() << "\n";
 
             cout << string(40, '-') << "\n";
-            cout << "\nData saved successfully. Goodbye!\n";
+            cout << "\nAll data saved successfully. Goodbye!\n";
         }
         break;
 

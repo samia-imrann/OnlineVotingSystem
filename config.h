@@ -1,4 +1,3 @@
-#pragma pack(push, 1)
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -111,21 +110,6 @@ public:
     }
 };
 
-const TownStation GeographicConfig::TOWN_STATIONS[] = {
-    {"Karachi", {"KHI01","KHI02","KHI03"}},
-    {"Lahore", {"LHR01","LHR02","LHR03"}},
-    {"Islamabad", {"ISB01","ISB02"}},
-    {"Rawalpindi", {"RWP01"}},
-    {"Faisalabad", {"FSD01"}},
-    {"Multan", {"MUL01"}},
-    {"Peshawar", {"PES01"}},
-    {"Quetta", {"QTA01"}},
-};
-
-const int GeographicConfig::TOWN_STATIONS_COUNT = 8;
-
-
-
 // =============================================
 // SYSTEM CONFIGURATION CONSTANTS
 // =============================================
@@ -147,6 +131,7 @@ const int NAME_SIZE = 50;
 const int CNIC_SIZE = 14;         // 13 digits + null
 const int PARTY_SIZE = 15;
 const int STATION_SIZE = 10;      // KHI01 format
+const int TOWN_SIZE = 20;         // Added: For town name storage
 const int PASS_SIZE = 20;
 
 // B-tree Configuration
@@ -158,16 +143,21 @@ const int MIN_KEYS = MIN_DEGREE - 1;
 const int DEFAULT_VOTING_DURATION = 300;  // 5 minutes in seconds
 const string DEFAULT_ADMIN_PASSWORD = "admin123";
 
+// Election Rules Configuration
+const int MAX_CANDIDATES_PER_STATION = 10; // Maximum candidates per station
+const bool ONE_PARTY_PER_STATION = true;   // Rule: Only one candidate per party per station
+
 // =============================================
 // DATA STRUCTURES
 // =============================================
 
-// Candidate Node Structure (for B-tree)
+// Candidate Node Structure (for B-tree) - MODIFIED
 struct CandidateNode {
     char candidateID[ID_SIZE];
     char name[NAME_SIZE];
     char cnic[CNIC_SIZE];
     char party[PARTY_SIZE];
+    char town[TOWN_SIZE];         // ADDED: Town field
     char pollingStation[STATION_SIZE];
     char password[PASS_SIZE];
     int voteCount;
@@ -177,31 +167,38 @@ struct CandidateNode {
         memset(name, 0, NAME_SIZE);
         memset(cnic, 0, CNIC_SIZE);
         memset(party, 0, PARTY_SIZE);
+        memset(town, 0, TOWN_SIZE);        // Initialize town
         memset(pollingStation, 0, STATION_SIZE);
         memset(password, 0, PASS_SIZE);
     }
 
+    // MODIFIED Constructor to include town - GCC COMPATIBLE VERSION
     CandidateNode(string id, string n, string c,
-        string p, string station,
+        string p, string townName, string station,  // Added townName parameter
         string pass)
         : voteCount(0) {
 
-        strncpy_s(candidateID, ID_SIZE, id.c_str(), _TRUNCATE);
+        // GCC-compatible version
+        strncpy(candidateID, id.c_str(), ID_SIZE - 1);
         candidateID[ID_SIZE - 1] = '\0';
 
-        strncpy_s(name, NAME_SIZE, n.c_str(), _TRUNCATE);
+        strncpy(name, n.c_str(), NAME_SIZE - 1);
         name[NAME_SIZE - 1] = '\0';
 
-        strncpy_s(cnic, CNIC_SIZE, c.c_str(), _TRUNCATE);
+        strncpy(cnic, c.c_str(), CNIC_SIZE - 1);
         cnic[CNIC_SIZE - 1] = '\0';
 
-        strncpy_s(party, PARTY_SIZE, p.c_str(), _TRUNCATE);
+        strncpy(party, p.c_str(), PARTY_SIZE - 1);
         party[PARTY_SIZE - 1] = '\0';
 
-        strncpy_s(pollingStation, STATION_SIZE, station.c_str(), _TRUNCATE);
+        // ADDED: Store town
+        strncpy(town, townName.c_str(), TOWN_SIZE - 1);
+        town[TOWN_SIZE - 1] = '\0';
+
+        strncpy(pollingStation, station.c_str(), STATION_SIZE - 1);
         pollingStation[STATION_SIZE - 1] = '\0';
 
-        strncpy_s(password, PASS_SIZE, pass.c_str(), _TRUNCATE);
+        strncpy(password, pass.c_str(), PASS_SIZE - 1);
         password[PASS_SIZE - 1] = '\0';
     }
 };
@@ -239,6 +236,18 @@ const map<string, string> PARTY_SECRET_CODES = {
     {"JI", "ji123"}
 };
 
-#endif // CONFIG_H
+// Define the static members at the end of the file
+const TownStation GeographicConfig::TOWN_STATIONS[] = {
+    {"Karachi", {"KHI01","KHI02","KHI03"}},
+    {"Lahore", {"LHR01","LHR02","LHR03"}},
+    {"Islamabad", {"ISB01","ISB02"}},
+    {"Rawalpindi", {"RWP01"}},
+    {"Faisalabad", {"FSD01"}},
+    {"Multan", {"MUL01"}},
+    {"Peshawar", {"PES01"}},
+    {"Quetta", {"QTA01"}},
+};
 
-#pragma pack(pop)
+const int GeographicConfig::TOWN_STATIONS_COUNT = 8;
+
+#endif // CONFIG_H

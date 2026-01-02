@@ -9,6 +9,7 @@
 #include <sstream>
 #include <iostream>
 #include <cstring>
+#include <algorithm> 
 #include <map>
 using namespace std;
 
@@ -16,40 +17,227 @@ class CandidateBTree {
 private:
     DiskManager dm;
     int rootBlock;
-    int nextCandidateID;
 
 
+    // Fix the splitChild function (around line 85)
+    void splitChild(BTreeNode* parent, int i, BTreeNode* child) {
+        BTreeNode* newChild = new BTreeNode(child->is_leaf);
+        newChild->disk_index = dm.allocateBlock();
 
-    void debugRootContents() {
-        BTreeNode* root = dm.loadNode(rootBlock);
-        if (!root) return;
-
-        cout << "DEBUG ROOT CONTENTS:\n";
-        cout << "key_count=" << root->key_count << ", is_leaf=" << root->is_leaf << endl;
-
-        for (int i = 0; i < root->key_count; i++) {
-            cout << "Candidate " << i << ":\n";
-            cout << "  ID: ";
-            for (int j = 0; j < ID_SIZE; j++) {
-                if (root->candidates[i].candidateID[j] == 0) break;
-                cout << root->candidates[i].candidateID[j];
-            }
-            cout << endl;
-
-            cout << "  Name: ";
-            for (int j = 0; j < NAME_SIZE; j++) {
-                if (root->candidates[i].name[j] == 0) break;
-                cout << root->candidates[i].name[j];
-            }
-            cout << endl;
-
-            cout << "  Raw bytes (ID): ";
-            for (int j = 0; j < ID_SIZE; j++) {
-                printf("%02X ", (unsigned char)root->candidates[i].candidateID[j]);
-            }
-            cout << endl;
+        if (newChild->disk_index == -1) {
+            delete newChild;
+            return;
         }
-        delete root;
+
+        // FIX: MIN_KEYS should be (MIN_DEGREE - 1)
+        int t = MIN_DEGREE;
+        newChild->key_count = t - 1;
+
+        // Copy the last (t-1) keys from child to newChild
+        for (int j = 0; j < t - 1; j++) {
+            newChild->candidates[j] = child->candidates[j + t];
+        }
+
+        // If not leaf, copy the last t children
+        if (!child->is_leaf) {
+            for (int j = 0; j < t; j++) {
+                newChild->child_indices[j] = child->child_indices[j + t];
+            }
+        }
+
+        // Reduce child's key count
+        child->key_count = t - 1;
+
+        // Make space in parent for the new child
+        for (int j = parent->key_count; j >= i + 1; j--) {
+            parent->child_indices[j + 1] = parent->child_indices[j];
+        }
+        parent->child_indices[i + 1] = newChild->disk_index;
+
+        // Make space in parent for the new key
+        for (int j = parent->key_count - 1; j >= i; j--) {
+            parent->candidates[j + 1] = parent->candidates[j];
+        }
+
+        // Move the middle key from child to parent
+        parent->candidates[i] = child->candidates[t - 1];
+        parent->key_count++;
+
+        // Clear the moved key from child
+        // This is important for consistency
+        memset(&child->candidates[t - 1], 0, sizeof(CandidateNode));
+
+        // Save all modified nodes
+        dm.saveNode(child);
+        dm.saveNode(newChild);
+        dm.saveNode(parent);
+
+        // Also save the new child's disk_index in parent's children array
+        dm.saveNode(parent);
+
+        delete newChild;
+    }
+
+    // Fix the getAllCandidatesRec function - add better debugging
+    void getAllCandidatesRec(int blockIndex, vector<CandidateNode>& result) {
+        if (blockIndex <= 0) return;
+
+        BTreeNode* node = dm.loadNode(blockIndex);
+        if (!node) {
+            cout << "ERROR: Failed to load node at block " << blockIndex << endl;
+            return;
+        }
+
+        // For each key in the node
+        for (int i = 0; i < node->key_count; i++) {
+            // Traverse left child if exists and not leaf
+            if (!node->is_leaf && node->child_indices[i] > 0) {
+                getAllCandidatesRec(node->child_indices[i], result);
+            }
+
+            // Add current candidate
+            CandidateNode copy;
+            memset(&copy, 0, sizeof(CandidateNode));
+
+            // Copy all fields including town - GCC COMPATIBLE VERSION
+            strncpy(copy.candidateID, node->candidates[i].candidateID, ID_SIZE - 1);
+            copy.candidateID[ID_SIZE - 1] = '\0';
+
+            strncpy(copy.name, node->candidates[i].name, NAME_SIZE - 1);
+            copy.name[NAME_SIZE - 1] = '\0';
+
+            strncpy(copy.cnic, node->candidates[i].cnic, CNIC_SIZE - 1);
+            copy.cnic[CNIC_SIZE - 1] = '\0';
+
+            strncpy(copy.party, node->candidates[i].party, PARTY_SIZE - 1);
+            copy.party[PARTY_SIZE - 1] = '\0';
+
+            // ADDED: Copy town field
+            strncpy(copy.town, node->candidates[i].town, TOWN_SIZE - 1);
+            copy.town[TOWN_SIZE - 1] = '\0';
+
+            strncpy(copy.pollingStation, node->candidates[i].pollingStation, STATION_SIZE - 1);
+            copy.pollingStation[STATION_SIZE - 1] = '\0';
+
+            strncpy(copy.password, node->candidates[i].password, PASS_SIZE - 1);
+            copy.password[PASS_SIZE - 1] = '\0';
+
+            copy.voteCount = node->candidates[i].voteCount;
+
+            result.push_back(copy);
+        }
+
+        // Traverse last child if exists and not leaf
+        if (!node->is_leaf && node->child_indices[node->key_count] > 0) {
+            getAllCandidatesRec(node->child_indices[node->key_count], result);
+        }
+
+        delete node;
+    }
+
+    // Fix the insertNonFull function to handle child indices properly
+    void insertNonFull(BTreeNode* node, CandidateNode* candidate) {
+        int i = node->key_count - 1;
+
+        if (node->is_leaf) {
+            // Find position to insert
+            while (i >= 0 && compareCandidateID(candidate->candidateID, node->candidates[i].candidateID) < 0) {
+                node->candidates[i + 1] = node->candidates[i];
+                i--;
+            }
+
+            // Insert at position i+1
+            node->candidates[i + 1] = *candidate;
+            node->key_count++;
+            dm.saveNode(node);
+        }
+        else {
+            // Find child to insert into
+            while (i >= 0 && compareCandidateID(candidate->candidateID, node->candidates[i].candidateID) < 0) {
+                i--;
+            }
+            i++;
+
+            if (i < 0 || i > MAX_KEYS) {
+                cout << "ERROR: Invalid index " << i << " in insertNonFull\n";
+                return;
+            }
+
+            if (node->child_indices[i] <= 0) {
+                cout << "ERROR: Invalid child index at position " << i << endl;
+                return;
+            }
+
+            BTreeNode* child = dm.loadNode(node->child_indices[i]);
+            if (!child) {
+                cout << "ERROR: Failed to load child at index " << node->child_indices[i] << endl;
+                return;
+            }
+
+            if (child->key_count == MAX_KEYS) {
+                splitChild(node, i, child);
+
+                // After split, determine which child to insert into
+                if (compareCandidateID(candidate->candidateID, node->candidates[i].candidateID) > 0) {
+                    i++;
+                }
+
+                // Reload the correct child
+                delete child;
+                child = dm.loadNode(node->child_indices[i]);
+                if (!child) {
+                    cout << "ERROR: Failed to reload child after split\n";
+                    return;
+                }
+            }
+
+            insertNonFull(child, candidate);
+            delete child;
+        }
+    }
+
+    // =============================================
+    // NEW HELPER METHODS FOR TOWN-BASED ASSIGNMENT
+    // =============================================
+
+    // Check if a party already has a candidate in specific polling station
+    bool isPartyInStation(const string& partyName, const string& stationID) {
+        vector<CandidateNode> allCandidates;
+        getAllCandidatesRec(rootBlock, allCandidates);
+
+        for (const auto& candidate : allCandidates) {
+            if (string(candidate.party) == partyName &&
+                string(candidate.pollingStation) == stationID) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Find available polling station for a party in a town
+    string findAvailableStation(const string& partyName, const string& town) {
+        vector<string> stations = GeographicConfig::getStationsForTown(town);
+
+        if (stations.empty()) {
+            cout << "Error: No polling stations found for town: " << town << endl;
+            return "";
+        }
+
+        cout << "\nChecking availability in " << town << " stations: ";
+        for (const string& station : stations) {
+            cout << station << " ";
+        }
+        cout << endl;
+
+        for (const string& station : stations) {
+            if (!isPartyInStation(partyName, station)) {
+                cout << "  ? Station " << station << " is available for " << partyName << endl;
+                return station; // First available station
+            }
+            cout << "  ? Station " << station << " already has a candidate from " << partyName << endl;
+        }
+
+        return ""; // No available station
     }
 
     int compareCandidateID(const string& id1, const string& id2) {
@@ -58,7 +246,7 @@ private:
 
     string generateCandidateID() {
         vector<CandidateNode> allCandidates;
-        inorderDetailedRec(rootBlock, allCandidates);
+        getAllCandidatesRec(rootBlock, allCandidates);
 
         int maxID = 0;
         for (const auto& candidate : allCandidates) {
@@ -87,185 +275,52 @@ private:
         return false;
     }
 
-    void splitChild(BTreeNode* parent, int i, BTreeNode* child) {
-        BTreeNode* newChild = new BTreeNode(child->is_leaf);
-        newChild->disk_index = dm.allocateBlock();
+    // NEW: Get candidates filtered by station from entire B-tree
+    void getCandidatesByStationRec(int blockIndex, const string& stationID, vector<CandidateNode>& result) {
+        if (blockIndex <= 0) return;
 
-        if (newChild->disk_index == -1) {
-            delete newChild;
+        BTreeNode* node = dm.loadNode(blockIndex);
+        if (!node) {
+            cout << "ERROR: Failed to load node at block " << blockIndex << " for station search" << endl;
             return;
         }
 
-        newChild->key_count = MIN_KEYS;
-
-        // Copy the last MIN_KEYS keys from child to newChild
-        for (int j = 0; j < MIN_KEYS; j++) {
-            newChild->candidates[j] = child->candidates[j + MIN_DEGREE];
-        }
-
-        // If not leaf, copy the last MIN_DEGREE children
-        if (!child->is_leaf) {
-            for (int j = 0; j < MIN_DEGREE; j++) {
-                newChild->child_indices[j] = child->child_indices[j + MIN_DEGREE];
-                child->child_indices[j + MIN_DEGREE] = -1; // Clear in old child
-            }
-        }
-
-        // Reduce child's key count (removes the keys moved to newChild)
-        child->key_count = MIN_KEYS;
-
-        // Make space in parent for the new child
-        for (int j = parent->key_count; j >= i + 1; j--) {
-            parent->child_indices[j + 1] = parent->child_indices[j];
-        }
-        parent->child_indices[i + 1] = newChild->disk_index;
-
-        // Make space in parent for the new key
-        for (int j = parent->key_count - 1; j >= i; j--) {
-            parent->candidates[j + 1] = parent->candidates[j];
-        }
-
-        // Move the middle key from child to parent
-        parent->candidates[i] = child->candidates[MIN_KEYS];
-        parent->key_count++;
-
-        // Save all modified nodes
-        dm.saveNode(child);
-        dm.saveNode(newChild);
-        dm.saveNode(parent);
-
-        delete newChild;
-    }
-
-    void insertNonFull(BTreeNode* node, CandidateNode* candidate) {
-        int i = node->key_count - 1;
-
-        if (node->is_leaf) {
-            // Find position to insert
-            while (i >= 0 && compareCandidateID(candidate->candidateID, node->candidates[i].candidateID) < 0) {
-                node->candidates[i + 1] = node->candidates[i];
-                i--;
-            }
-
-            // Insert at position i+1
-            node->candidates[i + 1] = *candidate;
-            node->key_count++;
-            dm.saveNode(node);
-        }
-        else {
-            // Find child to insert into
-            while (i >= 0 && compareCandidateID(candidate->candidateID, node->candidates[i].candidateID) < 0) {
-                i--;
-            }
-            i++;
-
-            if (i < 0 || i > MAX_KEYS) {
-                return; // Invalid index
-            }
-
-            BTreeNode* child = dm.loadNode(node->child_indices[i]);
-            if (!child) {
-                return; // Child not found
-            }
-
-            if (child->key_count == MAX_KEYS) {
-                splitChild(node, i, child);
-
-                // After split, determine which child to insert into
-                if (compareCandidateID(candidate->candidateID, node->candidates[i].candidateID) > 0) {
-                    i++;
-                }
-
-                // Load the correct child
-                delete child;
-                child = dm.loadNode(node->child_indices[i]);
-                if (!child) return;
-            }
-
-            insertNonFull(child, candidate);
-            dm.saveNode(child);
-            delete child;
-        }
-    }
-
-    void inorderDetailedRec(int blockIndex, vector<CandidateNode>& result) {
-        if (blockIndex <= 0) return;
-
-        BTreeNode* node = dm.loadNode(blockIndex);
-        if (!node) return;
-
         for (int i = 0; i < node->key_count; i++) {
-            // Traverse left child if exists
+            // Traverse left child first
             if (!node->is_leaf && node->child_indices[i] > 0) {
-                inorderDetailedRec(node->child_indices[i], result);
+                getCandidatesByStationRec(node->child_indices[i], stationID, result);
             }
 
-            // Add current candidate
-            CandidateNode copy;
-            memset(&copy, 0, sizeof(CandidateNode));
-
-            // FIXED: Use strncpy_s with proper null termination
-            strncpy_s(copy.candidateID, ID_SIZE, node->candidates[i].candidateID, _TRUNCATE);
-            copy.candidateID[ID_SIZE - 1] = '\0';
-
-            strncpy_s(copy.name, NAME_SIZE, node->candidates[i].name, _TRUNCATE);
-            copy.name[NAME_SIZE - 1] = '\0';
-
-            strncpy_s(copy.cnic, CNIC_SIZE, node->candidates[i].cnic, _TRUNCATE);
-            copy.cnic[CNIC_SIZE - 1] = '\0';
-
-            strncpy_s(copy.party, PARTY_SIZE, node->candidates[i].party, _TRUNCATE);
-            copy.party[PARTY_SIZE - 1] = '\0';
-
-            strncpy_s(copy.pollingStation, STATION_SIZE, node->candidates[i].pollingStation, _TRUNCATE);
-            copy.pollingStation[STATION_SIZE - 1] = '\0';
-
-            strncpy_s(copy.password, PASS_SIZE, node->candidates[i].password, _TRUNCATE);
-            copy.password[PASS_SIZE - 1] = '\0';
-
-            copy.voteCount = node->candidates[i].voteCount;
-
-            result.push_back(copy);
-        }
-
-        // Traverse last child
-        if (!node->is_leaf && node->child_indices[node->key_count] > 0) {
-            inorderDetailedRec(node->child_indices[node->key_count], result);
-        }
-
-        delete node;
-    }
-
-    void inorderStationRec(int blockIndex, const string& stationID, vector<CandidateNode>& result) {
-        if (blockIndex <= 0) return;
-        BTreeNode* node = dm.loadNode(blockIndex);
-        if (!node) return;
-
-        for (int i = 0; i < node->key_count; i++) {
-            if (!node->is_leaf && node->child_indices[i] > 0) {
-                inorderStationRec(node->child_indices[i], stationID, result);
-            }
-
+            // Check if candidate matches station filter
             if (stationID.empty() || string(node->candidates[i].pollingStation) == stationID) {
                 CandidateNode copy;
                 memset(&copy, 0, sizeof(CandidateNode));
 
-                strncpy_s(copy.candidateID, ID_SIZE, node->candidates[i].candidateID, _TRUNCATE);
+                // GCC COMPATIBLE VERSION
+                strncpy(copy.candidateID, node->candidates[i].candidateID, ID_SIZE - 1);
                 copy.candidateID[ID_SIZE - 1] = '\0';
 
-                strncpy_s(copy.name, NAME_SIZE, node->candidates[i].name, _TRUNCATE);
+                strncpy(copy.name, node->candidates[i].name, NAME_SIZE - 1);
                 copy.name[NAME_SIZE - 1] = '\0';
 
-                strncpy_s(copy.party, PARTY_SIZE, node->candidates[i].party, _TRUNCATE);
+                strncpy(copy.party, node->candidates[i].party, PARTY_SIZE - 1);
                 copy.party[PARTY_SIZE - 1] = '\0';
+
+                // ADDED: Copy town field
+                strncpy(copy.town, node->candidates[i].town, TOWN_SIZE - 1);
+                copy.town[TOWN_SIZE - 1] = '\0';
+
+                strncpy(copy.pollingStation, node->candidates[i].pollingStation, STATION_SIZE - 1);
+                copy.pollingStation[STATION_SIZE - 1] = '\0';
 
                 copy.voteCount = node->candidates[i].voteCount;
                 result.push_back(copy);
             }
         }
 
+        // Traverse last child
         if (!node->is_leaf && node->child_indices[node->key_count] > 0) {
-            inorderStationRec(node->child_indices[node->key_count], stationID, result);
+            getCandidatesByStationRec(node->child_indices[node->key_count], stationID, result);
         }
 
         delete node;
@@ -342,9 +397,8 @@ private:
     }
 
 public:
-    CandidateBTree() : rootBlock(-1), nextCandidateID(1) {
+    CandidateBTree() : rootBlock(-1) {
         rootBlock = dm.getRoot();
-        debugRootContents();
 
         if (rootBlock == -1) {
             // Create new tree
@@ -354,7 +408,6 @@ public:
                 dm.saveNode(root);
                 dm.setRoot(root->disk_index);
                 rootBlock = root->disk_index;
-                cout << "Created new B-tree with empty root at block: " << rootBlock << endl;
             }
             delete root;
         }
@@ -364,14 +417,12 @@ public:
             if (root) {
                 // Validate the node
                 if (root->key_count >= 0 && root->key_count <= MAX_KEYS) {
-                    cout << "Loaded existing B-tree from block: " << rootBlock
-                        << " with " << root->key_count << " keys" << endl;
+                    // Test traversal to see how many candidates we can load
+                    vector<CandidateNode> allCandidates;
+                    getAllCandidatesRec(rootBlock, allCandidates);
                 }
                 else {
                     // Corrupted data
-                    cout << "WARNING: Corrupted B-tree detected (key_count="
-                        << root->key_count << "). Creating new tree..." << endl;
-
                     // Create new empty tree
                     dm.setRoot(-1);
                     rootBlock = -1;
@@ -382,14 +433,12 @@ public:
                         dm.saveNode(newRoot);
                         dm.setRoot(newRoot->disk_index);
                         rootBlock = newRoot->disk_index;
-                        cout << "Created new empty root at block: " << rootBlock << endl;
                     }
                     delete newRoot;
                 }
                 delete root;
             }
             else {
-                cout << "Failed to load root node. Creating new tree..." << endl;
                 // Create new empty tree
                 BTreeNode* newRoot = new BTreeNode(true);
                 newRoot->disk_index = dm.allocateBlock();
@@ -397,7 +446,6 @@ public:
                     dm.saveNode(newRoot);
                     dm.setRoot(newRoot->disk_index);
                     rootBlock = newRoot->disk_index;
-                    cout << "Created new root at block: " << rootBlock << endl;
                 }
                 delete newRoot;
             }
@@ -435,13 +483,24 @@ public:
         return found;
     }
 
+    // MODIFIED: Now accepts town instead of pollingStation
     bool registerCandidate(string name, string cnic, string partyName,
-        string secretCode, string pollingStation, string password) {
+        string secretCode, string town, string password) {
 
         // Validate inputs
         if (name.empty() || cnic.empty() || partyName.empty() ||
-            secretCode.empty() || pollingStation.empty() || password.empty()) {
+            secretCode.empty() || town.empty() || password.empty()) {
             cout << "Error: All fields are required!\n";
+            return false;
+        }
+
+        // Validate town exists
+        if (!GeographicConfig::isValidTown(town)) {
+            cout << "Error: Invalid town! Available towns are:\n";
+            vector<string> towns = GeographicConfig::getAllTowns();
+            for (const auto& t : towns) {
+                cout << "  - " << t << "\n";
+            }
             return false;
         }
 
@@ -455,10 +514,23 @@ public:
             return false;
         }
 
+        // Find available polling station based on party and town
+        string pollingStation = findAvailableStation(partyName, town);
+
+        if (pollingStation.empty()) {
+            cout << "\n" << string(60, '=') << "\n";
+            cout << "  REGISTRATION REJECTED!\n";
+            cout << string(60, '=') << "\n";
+            cout << "All polling stations in " << town << " already have a candidate from " << partyName << ".\n";
+            cout << "Better luck next time!\n";
+            cout << string(60, '=') << "\n";
+            return false;
+        }
+
         string candidateID = generateCandidateID();
 
-        // Create candidate node
-        CandidateNode newCandidate(candidateID, name, cnic, partyName, pollingStation, password);
+        // Create candidate node with assigned polling station
+        CandidateNode newCandidate(candidateID, name, cnic, partyName, town, pollingStation, password);
         newCandidate.voteCount = 0;
 
         BTreeNode* root = dm.loadNode(rootBlock);
@@ -514,11 +586,15 @@ public:
 
         delete root;
 
-        cout << "\nCandidate Registered Successfully!\n";
+        cout << "\n" << string(60, '=') << "\n";
+        cout << "  CANDIDATE REGISTERED SUCCESSFULLY!\n";
+        cout << string(60, '=') << "\n";
         cout << "ID: " << candidateID << "\n";
         cout << "Name: " << name << "\n";
         cout << "Party: " << partyName << "\n";
-        cout << "Station: " << pollingStation << "\n";
+        cout << "Town: " << town << "\n";
+        cout << "Assigned Polling Station: " << pollingStation << "\n";
+        cout << string(60, '=') << "\n";
 
         return true;
     }
@@ -580,64 +656,87 @@ public:
 
     void printCandidatesTable() {
         vector<CandidateNode> allCandidates;
-        inorderDetailedRec(rootBlock, allCandidates);
+        getAllCandidatesRec(rootBlock, allCandidates);
 
         if (allCandidates.empty()) {
             cout << "\nNo candidates registered yet.\n";
             return;
         }
 
-        cout << "\n" << string(100, '-') << "\n";
+        cout << "\n" << string(120, '-') << "\n";
         cout << left << setw(10) << "ID" << setw(25) << "Name"
-            << setw(15) << "Party" << setw(15) << "Station" << setw(10) << "Votes" << "\n";
-        cout << string(100, '-') << "\n";
+            << setw(15) << "Party" << setw(15) << "Town" << setw(15) << "Station" << setw(10) << "Votes" << "\n";
+        cout << string(120, '-') << "\n";
+
+        // Sort candidates by ID for better display
+        sort(allCandidates.begin(), allCandidates.end(),
+            [](const CandidateNode& a, const CandidateNode& b) {
+                return string(a.candidateID) < string(b.candidateID);
+            });
 
         for (const auto& candidate : allCandidates) {
-            // Convert char arrays to proper strings
-            string id(candidate.candidateID, strnlen(candidate.candidateID, ID_SIZE));
-            string name(candidate.name, strnlen(candidate.name, NAME_SIZE));
-            string party(candidate.party, strnlen(candidate.party, PARTY_SIZE));
-            string station(candidate.pollingStation, strnlen(candidate.pollingStation, STATION_SIZE));
+            // Convert char arrays to proper strings - GCC COMPATIBLE VERSION
+            string id(candidate.candidateID);
+            string name(candidate.name);
+            string party(candidate.party);
+            string town(candidate.town);
+            string station(candidate.pollingStation);
 
             cout << left << setw(10) << id
                 << setw(25) << name
                 << setw(15) << party
+                << setw(15) << town
                 << setw(15) << station
                 << setw(10) << candidate.voteCount << "\n";
         }
 
-        cout << string(100, '-') << "\n";
+        cout << string(120, '-') << "\n";
         cout << "Total: " << allCandidates.size() << " candidates\n";
     }
 
-    void printCandidatesByStation(const string& stationID) {
+    // NEW: Get all candidates from specific station (for voters to view)
+    vector<CandidateNode> getCandidatesByStation(const string& stationID) {
         vector<CandidateNode> candidates;
-        inorderStationRec(rootBlock, stationID, candidates);
+        getCandidatesByStationRec(rootBlock, stationID, candidates);
+        return candidates;
+    }
+
+    void printCandidatesByStation(const string& stationID) {
+        vector<CandidateNode> candidates = getCandidatesByStation(stationID);
 
         cout << "\nCandidates contesting from Station: " << stationID << "\n";
-        cout << string(80, '-') << "\n";
+        cout << string(100, '-') << "\n";
 
         if (candidates.empty()) {
             cout << "No candidates found.\n";
             return;
         }
 
+        // Sort by votes descending
+        sort(candidates.begin(), candidates.end(),
+            [](const CandidateNode& a, const CandidateNode& b) {
+                return a.voteCount > b.voteCount;
+            });
+
         cout << left << setw(10) << "ID" << setw(25) << "Name"
-            << setw(15) << "Party" << setw(10) << "Votes" << "\n";
-        cout << string(80, '-') << "\n";
+            << setw(15) << "Party" << setw(15) << "Town" << setw(10) << "Votes" << "\n";
+        cout << string(100, '-') << "\n";
 
         for (const auto& c : candidates) {
-            string id(c.candidateID, strnlen(c.candidateID, ID_SIZE));
-            string name(c.name, strnlen(c.name, NAME_SIZE));
-            string party(c.party, strnlen(c.party, PARTY_SIZE));
+            // GCC COMPATIBLE VERSION
+            string id(c.candidateID);
+            string name(c.name);
+            string party(c.party);
+            string town(c.town);
 
             cout << left << setw(10) << id
                 << setw(25) << name
                 << setw(15) << party
+                << setw(15) << town
                 << setw(10) << c.voteCount << "\n";
         }
 
-        cout << string(80, '-') << "\n";
+        cout << string(100, '-') << "\n";
         cout << "Total: " << candidates.size() << " candidates\n";
     }
 
@@ -683,111 +782,11 @@ public:
         }
     }
 
-    // Debug and utility methods
-    void debugPrintTree() {
-        cout << "\n=== B-TREE DEBUG INFO ===\n";
-        cout << "Root block index: " << rootBlock << endl;
-
-        if (rootBlock == -1) {
-            cout << "Tree is empty\n";
-            return;
-        }
-
-        queue<int> q;
-        q.push(rootBlock);
-        int level = 0;
-
-        while (!q.empty()) {
-            int size = static_cast<int>(q.size());
-            cout << "\nLevel " << level++ << " (" << size << " nodes): \n";
-
-            for (int i = 0; i < size; i++) {
-                int idx = q.front();
-                q.pop();
-
-                if (idx <= 0) continue;
-
-                BTreeNode* node = dm.loadNode(idx);
-                if (!node) {
-                    cout << "  [Failed to load node " << idx << "]\n";
-                    continue;
-                }
-
-                cout << "  Node " << idx << ": keys=" << node->key_count
-                    << ", leaf=" << (node->is_leaf ? "yes" : "no") << "\n";
-
-                if (node->key_count > 0) {
-                    cout << "    Keys: [";
-                    for (int j = 0; j < node->key_count; j++) {
-                        // Convert char array to string properly
-                        string candidateID(node->candidates[j].candidateID,
-                            strnlen(node->candidates[j].candidateID, ID_SIZE));
-                        cout << "'" << candidateID << "'";
-                        if (j < node->key_count - 1) cout << ", ";
-                    }
-                    cout << "]\n";
-                }
-
-                if (!node->is_leaf) {
-                    cout << "    Children: [";
-                    bool first = true;
-                    for (int j = 0; j <= node->key_count; j++) {
-                        if (node->child_indices[j] > 0) {
-                            if (!first) cout << ", ";
-                            cout << node->child_indices[j];
-                            q.push(node->child_indices[j]);
-                            first = false;
-                        }
-                    }
-                    cout << "]\n";
-                }
-                delete node;
-            }
-        }
-        cout << "\n=== END DEBUG INFO ===\n";
-    }
-
-    vector<CandidateNode> getAllCandidatesBruteForce() {
+    //// Get all candidates (public version) - traverses entire B-tree
+    vector<CandidateNode> getAllCandidates() {
         vector<CandidateNode> allCandidates;
-
-        for (int blockIdx = 1; blockIdx < MAX_BLOCKS; blockIdx++) {
-            if (dm.isBitSet(blockIdx)) {
-                BTreeNode* node = dm.loadNode(blockIdx);
-                if (node) {
-                    for (int i = 0; i < node->key_count; i++) {
-                        allCandidates.push_back(node->candidates[i]);
-                    }
-                    delete node;
-                }
-            }
-        }
-
+        getAllCandidatesRec(rootBlock, allCandidates);
         return allCandidates;
-    }
-
-    void printAllCandidatesBruteForce() {
-        auto candidates = getAllCandidatesBruteForce();
-
-        cout << "\n" << string(100, '-') << "\n";
-        cout << left << setw(10) << "ID" << setw(25) << "Name"
-            << setw(15) << "Party" << setw(15) << "Station" << setw(10) << "Votes" << "\n";
-        cout << string(100, '-') << "\n";
-
-        for (const auto& candidate : candidates) {
-            string id(candidate.candidateID, strnlen(candidate.candidateID, ID_SIZE));
-            string name(candidate.name, strnlen(candidate.name, NAME_SIZE));
-            string party(candidate.party, strnlen(candidate.party, PARTY_SIZE));
-            string station(candidate.pollingStation, strnlen(candidate.pollingStation, STATION_SIZE));
-
-            cout << left << setw(10) << id
-                << setw(25) << name
-                << setw(15) << party
-                << setw(15) << station
-                << setw(10) << candidate.voteCount << "\n";
-        }
-
-        cout << string(100, '-') << "\n";
-        cout << "Total: " << candidates.size() << " candidates\n";
     }
 
     // Simple method to check if tree is empty
@@ -805,9 +804,103 @@ public:
     // Get total candidate count
     int getCandidateCount() {
         vector<CandidateNode> allCandidates;
-        inorderDetailedRec(rootBlock, allCandidates);
+        getAllCandidatesRec(rootBlock, allCandidates);
         return static_cast<int>(allCandidates.size());
     }
+
+    // NEW: Get candidates by town
+    vector<CandidateNode> getCandidatesByTown(const string& townName) {
+        vector<CandidateNode> allCandidates;
+        getAllCandidatesRec(rootBlock, allCandidates);
+
+        vector<CandidateNode> townCandidates;
+        for (const auto& candidate : allCandidates) {
+            if (string(candidate.town) == townName) {
+                townCandidates.push_back(candidate);
+            }
+        }
+        return townCandidates;
+    }
+
+    // NEW: Check station availability for a party in a town
+    bool checkStationAvailability(const string& partyName, const string& town) {
+        string availableStation = findAvailableStation(partyName, town);
+        return !availableStation.empty();
+    }
+
+    // NEW: Get available stations for a party in a town
+    vector<string> getAvailableStations(const string& partyName, const string& town) {
+        vector<string> stations = GeographicConfig::getStationsForTown(town);
+        vector<string> availableStations;
+
+        for (const string& station : stations) {
+            if (!isPartyInStation(partyName, station)) {
+                availableStations.push_back(station);
+            }
+        }
+
+        return availableStations;
+    }
+
+    // NEW: Print party-station allocations for a town
+    void printPartyAllocationsByTown(const string& town) {
+        vector<CandidateNode> allCandidates;
+        getAllCandidatesRec(rootBlock, allCandidates);
+
+        cout << "\n" << string(60, '=') << "\n";
+        cout << "PARTY ALLOCATIONS IN " << town << "\n";
+        cout << string(60, '=') << "\n";
+
+        // Group by polling station
+        map<string, vector<string>> stationParties;
+
+        for (const auto& candidate : allCandidates) {
+            if (string(candidate.town) == town) {
+                string station = string(candidate.pollingStation);
+                string party = string(candidate.party);
+                stationParties[station].push_back(party);
+            }
+        }
+
+        if (stationParties.empty()) {
+            cout << "No candidates registered in " << town << "\n";
+            return;
+        }
+
+        for (const auto& entry : stationParties) {
+            cout << "Station " << entry.first << ":\n";
+            for (const auto& party : entry.second) {
+                cout << "  - " << party << "\n";
+            }
+            cout << string(40, '-') << "\n";
+        }
+
+        vector<string> stations = GeographicConfig::getStationsForTown(town);
+        cout << "\nTotal Stations in " << town << ": " << stations.size() << "\n";
+        cout << "Stations with candidates: " << stationParties.size() << "\n";
+        cout << string(60, '=') << "\n";
+    }
+
+    int countAllCandidatesRecursive(int blockIndex) {
+        if (blockIndex <= 0) return 0;
+
+        BTreeNode* node = dm.loadNode(blockIndex);
+        if (!node) return 0;
+
+        int count = node->key_count;
+
+        if (!node->is_leaf) {
+            for (int i = 0; i <= node->key_count; i++) {
+                if (node->child_indices[i] > 0) {
+                    count += countAllCandidatesRecursive(node->child_indices[i]);
+                }
+            }
+        }
+
+        delete node;
+        return count;
+    }
+
 };
 
 #endif // CANDIDATEBTREE_H

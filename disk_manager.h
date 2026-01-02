@@ -93,21 +93,13 @@ public:
             cout << "Created new empty candidates.bin\n";
         }
 
-        // Get file size
         file.seekg(0, ios::end);
         streampos size = file.tellg();
-        cout << "DiskManager: File size = " << size << " bytes\n";
         file.seekg(0, ios::beg);
-
-        cout << "DiskManager: BITMAP_SIZE = " << BITMAP_SIZE
-            << ", METADATA_SIZE = " << METADATA_SIZE
-            << ", sizeof(BTreeNode) = " << sizeof(BTreeNode) << endl;
 
         file.read(bitmap, BITMAP_SIZE);
         file.read((char*)&rootIndex, sizeof(rootIndex));
         fileOpen = true;
-
-        cout << "DiskManager: Root index from file = " << rootIndex << endl;
     }
 
     ~DiskManager() {
@@ -163,9 +155,6 @@ public:
 
         file.write(buffer, sizeof(BTreeNode));
         file.flush();
-
-        cout << "Saved node " << node->disk_index << " at position " << position
-            << ", key_count=" << node->key_count << endl;
     }
 
     BTreeNode* createEmptyNode(bool isLeaf) {
@@ -177,17 +166,13 @@ public:
 
     BTreeNode* loadNode(int index) {
         if (!fileOpen || index <= 0 || index >= MAX_BLOCKS) {
-            cout << "loadNode: Invalid index " << index << endl;
             return nullptr;
         }
-
-        cout << "LOADING node " << index << "..." << endl;
 
         BTreeNode* node = new BTreeNode(true);
         char buffer[4096];
 
         long long position = METADATA_SIZE + (long long)(index - 1) * sizeof(BTreeNode);
-        cout << "  Position = " << position << endl;
 
         file.seekg(position, ios::beg);
         if (!file.good()) {
@@ -198,7 +183,6 @@ public:
 
         file.read(buffer, sizeof(BTreeNode));
         streamsize bytesRead = file.gcount();
-        cout << "  Read " << bytesRead << " bytes (expected " << sizeof(BTreeNode) << ")" << endl;
 
         if (bytesRead != sizeof(BTreeNode)) {
             cout << "  ERROR: Incomplete read!" << endl;
@@ -207,10 +191,6 @@ public:
         }
 
         deserialize_node(node, buffer);
-
-        cout << "  Loaded: key_count=" << node->key_count
-            << ", is_leaf=" << node->is_leaf
-            << ", disk_index=" << node->disk_index << endl;
 
         if (node->key_count < 0 || node->key_count > MAX_KEYS) {
             cout << "  ERROR: Corrupted key_count=" << node->key_count << endl;

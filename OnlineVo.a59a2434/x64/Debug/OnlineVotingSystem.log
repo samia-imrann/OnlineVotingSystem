@@ -1,4 +1,25 @@
 ﻿  OnlineVotingSystem.cpp
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\config.h(182,9): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\config.h(185,9): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\config.h(188,9): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\config.h(191,9): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\config.h(195,9): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\config.h(198,9): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\config.h(201,9): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
 C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voter.h(441,61): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
   (compiling source file 'OnlineVotingSystem.cpp')
   
@@ -8,13 +29,57 @@ C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voter.h(445,50): warning C4
 C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voter.h(470,67): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
   (compiling source file 'OnlineVotingSystem.cpp')
   
-C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(66,23): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(103,13): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   (compiling source file 'OnlineVotingSystem.cpp')
   
-C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(664,35): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(106,13): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   (compiling source file 'OnlineVotingSystem.cpp')
   
-C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(711,27): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(109,13): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   (compiling source file 'OnlineVotingSystem.cpp')
   
-  OnlineVotingSystem.vcxproj -> C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\x64\Debug\OnlineVotingSystem.exe
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(112,13): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(116,13): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(119,13): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(122,13): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(300,17): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(303,17): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(306,17): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(310,17): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\candidate.h(313,17): error C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(52,25): error C4996: 'ctime': This function or variable may be unsafe. Consider using ctime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(77,23): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(663,27): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(731,65): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(882,35): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
+C:\Users\User\Desktop\DS Projects\OnlineVotingSystem\voting_manager.h(1107,35): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+  (compiling source file 'OnlineVotingSystem.cpp')
+  
